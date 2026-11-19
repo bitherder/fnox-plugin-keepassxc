@@ -1,0 +1,13 @@
+[tools]
+lua = "5.4"
+rust = "stable"
+
+[tasks.test]
+description = "Run both Lua and Rust test suites"
+run = ["./scripts/test-lua.sh", "cargo test --manifest-path client/Cargo.toml"]
+
+[tasks."test:lua"]
+run = "./scripts/test-lua.sh"
+
+[tasks."test:rust"]
+run = "cargo test --manifest-path client/Cargo.toml"
