@@ -29,4 +29,20 @@ mod tests {
     fn rejects_an_empty_string() {
         assert_eq!(parse_reference(""), None);
     }
+
+    #[test]
+    fn maps_locked_database_to_auth_required() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::DatabaseLocked),
+            EXIT_AUTH_REQUIRED
+        );
+    }
+
+    #[test]
+    fn maps_unassociated_client_to_auth_required() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::NotAssociated),
+            EXIT_AUTH_REQUIRED
+        );
+    }
 }
