@@ -17,8 +17,8 @@ exposure (via a `fnox://<name>` URL) are reachable.
 
 ## Status
 
-Design/exploration stage. See project notes for the protocol writeup and
-decision log.
+Design/exploration stage. See [doc/project-plan.md](doc/project-plan.md) for
+the plan, decision log, and options under consideration.
 
 ## Development
 
