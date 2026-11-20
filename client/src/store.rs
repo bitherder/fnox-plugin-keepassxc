@@ -3,6 +3,109 @@
 //! The file holds a bearer credential (the identification key secret), so
 //! it is written owner-only.
 
+use std::ffi::OsStr;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+
+use keepassxc_client::crypto::b64;
+
+#[cfg(unix)]
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+/// The KeePassXC association: the client id and the 32-byte secret that
+/// proves possession of it. No `Debug` or `Clone`, so the secret cannot be
+/// printed or copied by accident.
+pub struct StoredAssociation {
+    pub id: String,
+    pub id_key_secret: [u8; 32],
+}
+
+/// Resolves the association file. A relative `xdg_state_home` is ignored,
+/// as the XDG Base Directory spec requires.
+pub fn state_path(xdg_state_home: Option<&OsStr>, home: Option<&OsStr>) -> Option<PathBuf> {
+    let xdg = xdg_state_home
+        .map(Path::new)
+        .filter(|path| path.is_absolute());
+    let state_dir = match xdg {
+        Some(xdg) => xdg.to_path_buf(),
+        None => home
+            .map(Path::new)
+            .filter(|path| path.is_absolute())?
+            .join(".local/state"),
+    };
+    Some(
+        state_dir
+            .join("fnox-plugin-keepassxc")
+            .join("association.json"),
+    )
+}
+
+/// Returns `Ok(None)` when no association has been saved yet.
+pub fn load(path: &Path) -> io::Result<Option<StoredAssociation>> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(invalid_data)?;
+    let id = value["id"]
+        .as_str()
+        .ok_or_else(|| invalid_data("missing id"))?;
+    let secret = value["id_key_secret"]
+        .as_str()
+        .ok_or_else(|| invalid_data("missing id_key_secret"))?;
+    let id_key_secret = b64::dec(secret)
+        .map_err(invalid_data)?
+        .try_into()
+        .map_err(|_| invalid_data("id_key_secret is not 32 bytes"))?;
+    Ok(Some(StoredAssociation {
+        id: id.to_string(),
+        id_key_secret,
+    }))
+}
+
+/// Writes the file and its directory owner-only (0600 and 0700 on Unix),
+/// tightening an existing file or directory that is looser.
+pub fn save(path: &Path, assoc: &StoredAssociation) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+        #[cfg(unix)]
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+    }
+    let json = serde_json::json!({
+        "id": assoc.id,
+        "id_key_secret": b64::enc(&assoc.id_key_secret),
+    });
+    write_private(path, json.to_string().as_bytes())
+}
+
+#[cfg(unix)]
+fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    use io::Write;
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.set_permissions(fs::Permissions::from_mode(0o600))?;
+    file.write_all(bytes)
+}
+
+#[cfg(not(unix))]
+fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    fs::write(path, bytes)
+}
+
+fn invalid_data<E>(error: E) -> io::Error
+where
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    io::Error::new(io::ErrorKind::InvalidData, error)
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::OsStr;
