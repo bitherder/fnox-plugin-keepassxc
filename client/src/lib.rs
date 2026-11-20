@@ -14,6 +14,9 @@ pub const EXIT_UNAVAILABLE: i32 = 5;
 pub fn exit_code_for(error: &KxcError) -> i32 {
     match error {
         KxcError::DatabaseLocked | KxcError::NotAssociated => EXIT_AUTH_REQUIRED,
+        KxcError::SocketNotFound(_) | KxcError::ConnectionClosed | KxcError::Io(_) => {
+            EXIT_UNAVAILABLE
+        }
         _ => EXIT_ERROR,
     }
 }
@@ -84,6 +87,40 @@ mod tests {
             exit_code_for(&keepassxc_client::KxcError::Io(io)),
             EXIT_UNAVAILABLE
         );
+    }
+
+    #[test]
+    fn maps_crypto_failure_to_error() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::Crypto),
+            EXIT_ERROR
+        );
+    }
+
+    #[test]
+    fn maps_nonce_mismatch_to_error() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::NonceMismatch),
+            EXIT_ERROR
+        );
+    }
+
+    #[test]
+    fn maps_keepassxc_error_to_error() {
+        let error = keepassxc_client::KxcError::KeePassXc {
+            code: Some(1),
+            message: "denied".into(),
+        };
+        assert_eq!(exit_code_for(&error), EXIT_ERROR);
+    }
+
+    #[test]
+    fn maps_unexpected_response_to_error() {
+        let error = keepassxc_client::KxcError::UnexpectedResponse {
+            action: "get-logins".into(),
+            detail: "missing entries".into(),
+        };
+        assert_eq!(exit_code_for(&error), EXIT_ERROR);
     }
 
     #[test]
