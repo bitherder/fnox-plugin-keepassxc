@@ -222,8 +222,13 @@ exactly when it prompts for a client that is already associated. Test this in th
 | macOS Keychain                      | Not readable by other processes without a prompt or ACL | More code; needs the Security framework or `security(1)` |
 | File under `~/.config/` with `0600` | Simple and inspectable                                  | Readable by anything running as the user                 |
 
-Unresolved. Also decide whether one association is shared across projects or whether each
-project gets its own.
+**Decided (2026-11-20): a `0600` file under `$XDG_STATE_HOME`.** It is
+`$XDG_STATE_HOME/fnox-plugin-keepassxc/association.json` (falling back to
+`$HOME/.local/state`), with the directory at `0700`. It holds the association id and the 32-byte
+identification key, and it is a bearer credential. It is kept out of the dotfiles repo, and it
+works the same on macOS and Linux with no prompts. The Keychain stays an option behind the same
+interface. Still open: whether one association is shared across projects or whether each project
+gets its own.
 
 ## Live test database (specification)
 
@@ -544,3 +549,14 @@ Points to note:
   Commits `1f4257c` (red) and `58a9df0` (green).
 * Ran `rumdl fmt` on this file so that `rumdl check` passes. The changes are layout only: list
   markers, table padding, and wrapping.
+* Plan step 4 is done in the code, but not yet verified live. The association is stored in
+  `$XDG_STATE_HOME/fnox-plugin-keepassxc/association.json` with mode `0600` (Option D). The
+  client maps lookup outcomes to exit codes, with `NotFound` to 3. The CLI supports `--version`,
+  `associate`, and `fnox://<name>`, and every failure path maps to an exit code. Commits: storage
+  `fccd899` (red) and `6f4c16c` (green); exit 3 `24a1924` (red) and `d95a7bf` (green); CLI
+  `32e0dcc` (red) and `685a492` (green).
+* Not verified: the success path (`Found`, password on stdout) against a real KeePassXC. The
+  automated tests use a fake KeePassXC, and the live `associate` needs a click in KeePassXC.
+* Known gaps: `6f4c16c` includes a one-line `rustfmt` change in new code, which `AGENTS.md`
+  would normally keep in its own commit. `scripts/test-integration.sh` leaves two temporary
+  directories behind on each run, because `exec` replaces the shell.
