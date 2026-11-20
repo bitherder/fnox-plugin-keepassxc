@@ -3,7 +3,7 @@
 //! Kept separate from `main.rs` so the protocol/parsing logic is unit
 //! testable without a running KeePassXC instance or CLI argument handling.
 
-use keepassxc_client::KxcError;
+use keepassxc_client::{KxcClient, KxcError, transport::Transport};
 
 pub const EXIT_OK: i32 = 0;
 pub const EXIT_ERROR: i32 = 1;
@@ -27,6 +27,26 @@ pub fn exit_code_for(error: &KxcError) -> i32 {
 /// Returns `None` if `reference` doesn't use the expected scheme.
 pub fn parse_reference(reference: &str) -> Option<&str> {
     reference.strip_prefix("fnox://")
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Lookup {
+    Found(String),
+    NotFound,
+    Ambiguous(usize),
+}
+
+pub async fn lookup<T: Transport>(
+    client: &mut KxcClient<T>,
+    name: &str,
+) -> Result<Lookup, KxcError> {
+    let url = format!("fnox://{name}");
+    let entries = client.get_logins(&url).await?;
+    Ok(match entries.as_slice() {
+        [] => Lookup::NotFound,
+        [entry] => Lookup::Found(entry.password.clone()),
+        many => Lookup::Ambiguous(many.len()),
+    })
 }
 
 #[cfg(test)]

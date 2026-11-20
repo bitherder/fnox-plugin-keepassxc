@@ -96,7 +96,10 @@ impl FakeKeePassXc {
 
     fn open(&self, frame: &Value) -> Value {
         let ciphertext = b64::dec(frame["message"].as_str().unwrap()).unwrap();
-        let plaintext = self.crypto.decrypt(&ciphertext, &request_nonce(frame)).unwrap();
+        let plaintext = self
+            .crypto
+            .decrypt(&ciphertext, &request_nonce(frame))
+            .unwrap();
         serde_json::from_slice(&plaintext).unwrap()
     }
 
