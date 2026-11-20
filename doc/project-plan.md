@@ -661,7 +661,7 @@ Points to note:
   scheme gate, that additional URLs are checked, and that `keepassxc://by-path/` is a native
   selector. Recorded under Option C.
 * Wrote the live test database specification. Awaiting the user's test database.
-* Added `AGENTS.md` (commit `179313e`). It sets the red/green rules, the `#RED` and `#GREEN`
+* Added `AGENTS.md` (commit `7ac43db`). It sets the red/green rules, the `#RED` and `#GREEN`
   tags, the `rumdl` check before Markdown commits, and the no-push rule.
 * Plan step 2 is done. The client maps `DatabaseLocked` and `NotAssociated` to exit 4, the
   unreachable errors (`SocketNotFound`, `ConnectionClosed`, `Io`) to exit 5, and the rest to exit
@@ -677,18 +677,18 @@ Points to note:
 * Plan step 1 is done. `provider.lua` branches on the client's exit status instead of matching
   stderr. Status 4 calls `fnox.auth_error`, and status 5 raises "KeePassXC is not reachable". Status
   1 and 2 raise. Other statuses return nil, including not-found, because exit 3 is not defined yet.
-  Commits `1f4257c` (red) and `58a9df0` (green).
+  Commits `c13354c` (red) and `af37425` (green).
 * Ran `rumdl fmt` on this file so that `rumdl check` passes. The changes are layout only: list
   markers, table padding, and wrapping.
 * Plan step 4 is done in the code, but not yet verified live. The association is stored in
   `$XDG_STATE_HOME/fnox-plugin-keepassxc/association.json` with mode `0600` (Option D). The
   client maps lookup outcomes to exit codes, with `NotFound` to 3. The CLI supports `--version`,
   `associate`, and `fnox://<name>`, and every failure path maps to an exit code. Commits: storage
-  `fccd899` (red) and `6f4c16c` (green); exit 3 `24a1924` (red) and `d95a7bf` (green); CLI
-  `32e0dcc` (red) and `685a492` (green).
+  `7e9b703` (red) and `5b1ce83` (green); exit 3 `0104d52` (red) and `2c2a8cc` (green); CLI
+  `b4af031` (red) and `f897b46` (green).
 * Not verified: the success path (`Found`, password on stdout) against a real KeePassXC. The
   automated tests use a fake KeePassXC, and the live `associate` needs a click in KeePassXC.
-* Known gaps: `6f4c16c` includes a one-line `rustfmt` change in new code, which `AGENTS.md`
+* Known gaps: `5b1ce83` includes a one-line `rustfmt` change in new code, which `AGENTS.md`
   would normally keep in its own commit. `scripts/test-integration.sh` leaves two temporary
   directories behind on each run, because `exec` replaces the shell.
 
@@ -698,8 +698,8 @@ Points to note:
   `$HOME/.local/share`. The association is created by the user's approval in KeePassXC, so losing
   it would surprise the user. That makes it user data, not state, by the XDG spec's distinction.
   The earlier entries above that name `$XDG_STATE_HOME` describe the state. They are not
-  rewritten. Commits: `a4ff139` (red) and `82e6345` (green).
-* Corrected two statements that were out of date. The CLI is wired (`685a492`), so the README and
+  edited. Commits: `58f10e2` (red) and `b39faf5` (green).
+* Corrected two statements that were out of date. The CLI is wired (`f897b46`), so the README and
   the "Current code state" paragraph no longer say the binary only echoes its input. The live check
   against KeePassXC is still pending.
 * Recorded how the browser extension stores its identification key, with links to the protocol
