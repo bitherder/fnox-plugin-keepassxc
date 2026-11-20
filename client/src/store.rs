@@ -1,4 +1,4 @@
-//! Persists the KeePassXC association under `$XDG_STATE_HOME`.
+//! Persists the KeePassXC association under `$XDG_DATA_HOME`.
 //!
 //! The file holds a bearer credential (the identification key secret), so
 //! it is written owner-only.
@@ -21,21 +21,21 @@ pub struct StoredAssociation {
     pub id_key_secret: [u8; 32],
 }
 
-/// Resolves the association file. A relative `xdg_state_home` is ignored,
+/// Resolves the association file. A relative `xdg_data_home` is ignored,
 /// as the XDG Base Directory spec requires.
-pub fn state_path(xdg_state_home: Option<&OsStr>, home: Option<&OsStr>) -> Option<PathBuf> {
-    let xdg = xdg_state_home
+pub fn data_path(xdg_data_home: Option<&OsStr>, home: Option<&OsStr>) -> Option<PathBuf> {
+    let xdg = xdg_data_home
         .map(Path::new)
         .filter(|path| path.is_absolute());
-    let state_dir = match xdg {
+    let data_dir = match xdg {
         Some(xdg) => xdg.to_path_buf(),
         None => home
             .map(Path::new)
             .filter(|path| path.is_absolute())?
-            .join(".local/state"),
+            .join(".local/share"),
     };
     Some(
-        state_dir
+        data_dir
             .join("fnox-plugin-keepassxc")
             .join("association.json"),
     )

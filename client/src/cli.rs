@@ -37,7 +37,7 @@ pub async fn run(args: &[String]) -> i32 {
 }
 
 async fn associate() -> i32 {
-    let path = match state_path() {
+    let path = match data_path() {
         Ok(path) => path,
         Err(code) => return code,
     };
@@ -67,7 +67,7 @@ async fn associate() -> i32 {
 }
 
 async fn fetch(name: &str) -> i32 {
-    let path = match state_path() {
+    let path = match data_path() {
         Ok(path) => path,
         Err(code) => return code,
     };
@@ -111,11 +111,11 @@ async fn fetch(name: &str) -> i32 {
     exit_code_for_lookup(&outcome)
 }
 
-fn state_path() -> Result<PathBuf, i32> {
-    let xdg = std::env::var_os("XDG_STATE_HOME");
+fn data_path() -> Result<PathBuf, i32> {
+    let xdg = std::env::var_os("XDG_DATA_HOME");
     let home = std::env::var_os("HOME");
-    store::state_path(xdg.as_deref(), home.as_deref()).ok_or_else(|| {
-        eprintln!("cannot locate state directory: set HOME or XDG_STATE_HOME");
+    store::data_path(xdg.as_deref(), home.as_deref()).ok_or_else(|| {
+        eprintln!("cannot locate data directory: set HOME or XDG_DATA_HOME");
         EXIT_ERROR
     })
 }
