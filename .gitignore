@@ -3,3 +3,4 @@
 /.luarocks/
 *.rock
 .DS_Store
+/tmp
