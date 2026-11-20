@@ -38,8 +38,8 @@ Verify live:
 
 Wire up:
 
-* [ ] Make `kpxc-client` reachable: on PATH (for example `cargo install --path client`) or set
-  `client_bin` in the provider options [Known risks, item 9]
+* [ ] Add a `build` mise task that builds `client/target/release/kpxc-client`, and check that the
+  plugin finds it by the lookup order in [Binary location and wiring]
 * [ ] Run the plugin through the real fnox: `fnox provider test` and `fnox get` [Lua plugins]
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
 * [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
@@ -66,19 +66,20 @@ That is the discomfort this project exists to avoid.
 
 ## Decisions
 
-| #   | Decision                                                                                                                                 | Date       | Notes                                                                                                              |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                              |
-| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                        | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                            |
-| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>` | 2026-11-19 |                                                                                                                    |
-| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                 | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                   |
-| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                              | 2026-11-19 | User choice; it is a protocol client                                                                               |
-| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                | 2026-11-19 |                                                                                                                    |
-| D7  | Automated tests first, for both Lua and Rust                                                                                             | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                            |
-| D8  | Rust for the client                                                                                                                      | 2026-11-19 | Single static binary, installable via mise                                                                         |
-| D9  | Do not re-implement the protocol; use an existing crate                                                                                  | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                     |
-| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                              | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)         |
-| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                             | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20) |
+| #   | Decision                                                                                                                                                                                | Date       | Notes                                                                                                                                                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user                                                | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                                                 |
+| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                                                                       | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                                               |
+| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>`                                                | 2026-11-19 |                                                                                                                                                       |
+| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                                                                | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                                                      |
+| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                                                                             | 2026-11-19 | User choice; it is a protocol client                                                                                                                  |
+| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                                                               | 2026-11-19 |                                                                                                                                                       |
+| D7  | Automated tests first, for both Lua and Rust                                                                                                                                            | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                                               |
+| D8  | Rust for the client                                                                                                                                                                     | 2026-11-19 | Single static binary, installable via mise                                                                                                            |
+| D9  | Do not re-implement the protocol; use an existing crate                                                                                                                                 | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                                                        |
+| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                                                                             | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                                            |
+| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                                                                            | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)                                    |
+| D12 | Find the client binary relative to the plugin: `client_bin` option, then `<plugin_dir>/client/target/release/kpxc-client`, then PATH. Build it with a mise task. Defer release binaries | 2026-11-20 | Git-installed plugins have no build step, so a linked checkout is the development path. See [Binary location and wiring](#binary-location-and-wiring) |
 
 ## Architecture (current intent)
 
@@ -101,6 +102,52 @@ fnox ──(Lua hook get(ctx, ref))──> provider.lua
   be tested in-process with KC's public `transport::mock::MockTransport`. No extra trait of
   our own is needed unless we later swap libraries.
 * `get_batch` can later resolve several secrets in one process and one connection.
+
+### Binary location and wiring
+
+`provider.lua` finds the client binary in this order, and the first match wins:
+
+1. The `client_bin` provider option, if set.
+2. `<plugin_dir>/client/target/release/kpxc-client`. fnox documents `ctx.plugin_dir`, so this works
+   for a linked checkout, and for a git install that someone has built in place.
+3. `kpxc-client` on PATH.
+
+If none is found, `provider.lua` raises an error that names the build command. The build is a
+mise task in the repo, which does not exist yet. Release binaries are deferred. Git installs have
+no build step, so that case still needs the build run in the plugin's directory.
+
+**Unverified:** whether the fnox Lua environment can check that a file exists. If it cannot, the
+lookup needs another route.
+
+Development, from a linked checkout:
+
+```toml
+# fnox.toml
+[providers.keepassxc]
+type = "lua"
+plugin = "keepassxc"   # the name given to `fnox plugin link`
+auth_command = "<checkout>/client/target/release/kpxc-client associate"
+
+[secrets]
+GITHUB_TOKEN = { provider = "keepassxc", value = "fnox://github-token" }
+```
+
+Run `fnox plugin link keepassxc ~/Projects/fnox-plugin-keepassxc` once. Then
+`fnox provider test keepassxc` checks that the plugin loads.
+
+Sharing, from a git source:
+
+```toml
+[plugins]
+keepassxc = "bitherder/fnox-plugin-keepassxc#v0.1.0"
+
+[providers.keepassxc]
+type = "lua"
+plugin = "keepassxc"
+```
+
+`auth_command` runs outside the plugin, so it needs an absolute path or a binary on PATH. The
+plugin lookup alone does not provide one.
 
 ### Current code state
 
@@ -539,8 +586,8 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
    point.
    **Finding (2026-11-20):** fnox is installed through mise, at
    `~/.local/share/mise/installs/fnox/latest/fnox` (path confirmed with `which`).
-   `kpxc-client` is not on PATH, so `client_bin` or a PATH entry must be set before the
-   plugin can run.
+   `kpxc-client` is not on PATH. Decision D12 locates the binary relative to the plugin, see
+   [Binary location and wiring](#binary-location-and-wiring).
 
 ## Next steps
 
@@ -712,3 +759,9 @@ Points to note:
   through fnox. Recorded two findings: with Remember unticked, each lookup prompts again, which
   matters for `mise` activation (Known risks, item 4), and fnox is installed through mise, but
   `kpxc-client` is not on PATH (Known risks, item 9).
+* Decided D12: the client binary is found relative to the plugin (`client_bin`, then
+  `<plugin_dir>/client/target/release/kpxc-client`, then PATH), with a mise build task. Release
+  binaries are deferred. Added the wiring for development (`fnox plugin link`) and for sharing (a
+  git source), in [Binary location and wiring](#binary-location-and-wiring). Two points are
+  unverified: whether the Lua environment can check for a file, and whether `auth_command` can
+  reach a binary in the plugin directory.
