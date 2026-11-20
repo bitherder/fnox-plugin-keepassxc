@@ -3,6 +3,21 @@
 //! Kept separate from `main.rs` so the protocol/parsing logic is unit
 //! testable without a running KeePassXC instance or CLI argument handling.
 
+use keepassxc_client::KxcError;
+
+pub const EXIT_OK: i32 = 0;
+pub const EXIT_ERROR: i32 = 1;
+pub const EXIT_USAGE: i32 = 2;
+pub const EXIT_AUTH_REQUIRED: i32 = 4;
+pub const EXIT_UNAVAILABLE: i32 = 5;
+
+pub fn exit_code_for(error: &KxcError) -> i32 {
+    match error {
+        KxcError::DatabaseLocked | KxcError::NotAssociated => EXIT_AUTH_REQUIRED,
+        _ => EXIT_ERROR,
+    }
+}
+
 /// Placeholder: parses an `fnox://<name>` reference into the bare name used
 /// to tag entries' URL fields in KeePassXC.
 ///
@@ -44,5 +59,19 @@ mod tests {
             exit_code_for(&keepassxc_client::KxcError::NotAssociated),
             EXIT_AUTH_REQUIRED
         );
+    }
+
+    #[test]
+    fn exit_codes_are_distinct_and_ok_is_zero() {
+        assert_eq!(EXIT_OK, 0);
+        let codes = [
+            EXIT_OK,
+            EXIT_ERROR,
+            EXIT_USAGE,
+            EXIT_AUTH_REQUIRED,
+            EXIT_UNAVAILABLE,
+        ];
+        let unique: std::collections::HashSet<i32> = codes.into_iter().collect();
+        assert_eq!(unique.len(), codes.len());
     }
 }
