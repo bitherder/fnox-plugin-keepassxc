@@ -12,3 +12,6 @@ name = "kpxc-client"
 path = "src/main.rs"
 
 [dependencies]
+# Pinned exactly: 0.1.0 is young and handles the security-sensitive protocol
+# path. Upgrade deliberately and re-run the integration suite.
+keepassxc-client = "=0.1.0"
