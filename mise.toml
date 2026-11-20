@@ -3,11 +3,19 @@ lua = "5.4"
 rust = "stable"
 
 [tasks.test]
-description = "Run both Lua and Rust test suites"
-run = ["./scripts/test-lua.sh", "cargo test --manifest-path client/Cargo.toml"]
+description = "Run Lua unit, Rust, and Lua<->Rust integration test suites"
+run = [
+  "./scripts/test-lua.sh",
+  "cargo test --manifest-path client/Cargo.toml",
+  "./scripts/test-integration.sh",
+]
 
 [tasks."test:lua"]
 run = "./scripts/test-lua.sh"
 
 [tasks."test:rust"]
 run = "cargo test --manifest-path client/Cargo.toml"
+
+[tasks."test:integration"]
+description = "Build the real client and verify the Lua provider calls it end to end"
+run = "./scripts/test-integration.sh"

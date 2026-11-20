@@ -3,8 +3,11 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some(reference) => match kpxc_client::parse_reference(reference) {
             Some(name) => {
-                eprintln!("not yet implemented: would look up entries tagged fnox://{name}");
-                std::process::exit(1);
+                // TODO: replace with a real KeePassXC Browser Protocol lookup.
+                // For now this just echoes the parsed name, which is enough
+                // to prove the fnox Lua plugin -> this binary -> stdout path
+                // end to end (see spec/integration).
+                println!("{name}");
             }
             None => {
                 eprintln!("invalid reference: {reference} (expected fnox://<name>)");
