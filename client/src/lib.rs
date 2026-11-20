@@ -10,6 +10,7 @@ mod store;
 pub const EXIT_OK: i32 = 0;
 pub const EXIT_ERROR: i32 = 1;
 pub const EXIT_USAGE: i32 = 2;
+pub const EXIT_NOT_FOUND: i32 = 3;
 pub const EXIT_AUTH_REQUIRED: i32 = 4;
 pub const EXIT_UNAVAILABLE: i32 = 5;
 
@@ -20,6 +21,14 @@ pub fn exit_code_for(error: &KxcError) -> i32 {
             EXIT_UNAVAILABLE
         }
         _ => EXIT_ERROR,
+    }
+}
+
+pub fn exit_code_for_lookup(outcome: &Lookup) -> i32 {
+    match outcome {
+        Lookup::Found(_) => EXIT_OK,
+        Lookup::NotFound => EXIT_NOT_FOUND,
+        Lookup::Ambiguous(_) => EXIT_ERROR,
     }
 }
 
