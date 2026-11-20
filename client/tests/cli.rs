@@ -16,18 +16,18 @@ impl Sandbox {
         let root =
             std::env::temp_dir().join(format!("fnox-cli-test-{}-{test}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        for dir in [root.join("state"), root.join("runtime"), root.join("tmp")] {
+        for dir in [root.join("data"), root.join("runtime"), root.join("tmp")] {
             fs::create_dir_all(dir).unwrap();
         }
         Self { root }
     }
 
-    fn state_dir(&self) -> PathBuf {
-        self.root.join("state")
+    fn data_dir(&self) -> PathBuf {
+        self.root.join("data")
     }
 
     fn association_file(&self) -> PathBuf {
-        self.state_dir()
+        self.data_dir()
             .join("fnox-plugin-keepassxc")
             .join("association.json")
     }
@@ -36,7 +36,7 @@ impl Sandbox {
         Command::new(BIN)
             .args(args)
             .env("HOME", &self.root)
-            .env("XDG_STATE_HOME", self.state_dir())
+            .env("XDG_DATA_HOME", self.data_dir())
             .env("XDG_RUNTIME_DIR", self.root.join("runtime"))
             .env("TMPDIR", self.root.join("tmp"))
             .output()

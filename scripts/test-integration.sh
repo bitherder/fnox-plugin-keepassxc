@@ -9,6 +9,6 @@ mise exec -- cargo build --manifest-path client/Cargo.toml
 export LUA_PATH="./lua_modules/share/lua/5.4/?.lua;./lua_modules/share/lua/5.4/?/init.lua;;"
 export LUA_CPATH="./lua_modules/lib/lua/5.4/?.so;;"
 isolated_home="$(mktemp -d)"
-isolated_state="$(mktemp -d)"
-exec mise exec -- env HOME="$isolated_home" XDG_STATE_HOME="$isolated_state" \
+isolated_data="$(mktemp -d)"
+exec mise exec -- env HOME="$isolated_home" XDG_DATA_HOME="$isolated_data" \
 	busted --tags=integration spec/integration "$@"

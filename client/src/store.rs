@@ -122,41 +122,41 @@ mod tests {
     }
 
     #[test]
-    fn state_path_uses_xdg_state_home_when_absolute() {
+    fn data_path_uses_xdg_data_home_when_absolute() {
         assert_eq!(
-            state_path(Some(OsStr::new("/xdg/state")), Some(OsStr::new("/home/me"))),
+            data_path(Some(OsStr::new("/xdg/data")), Some(OsStr::new("/home/me"))),
             Some(PathBuf::from(
-                "/xdg/state/fnox-plugin-keepassxc/association.json"
+                "/xdg/data/fnox-plugin-keepassxc/association.json"
             ))
         );
     }
 
     #[test]
-    fn state_path_ignores_relative_xdg_state_home() {
+    fn data_path_ignores_relative_xdg_data_home() {
         assert_eq!(
-            state_path(
-                Some(OsStr::new("relative/state")),
+            data_path(
+                Some(OsStr::new("relative/data")),
                 Some(OsStr::new("/home/me"))
             ),
             Some(PathBuf::from(
-                "/home/me/.local/state/fnox-plugin-keepassxc/association.json"
+                "/home/me/.local/share/fnox-plugin-keepassxc/association.json"
             ))
         );
     }
 
     #[test]
-    fn state_path_falls_back_to_home_local_state() {
+    fn data_path_falls_back_to_home_local_share() {
         assert_eq!(
-            state_path(None, Some(OsStr::new("/home/me"))),
+            data_path(None, Some(OsStr::new("/home/me"))),
             Some(PathBuf::from(
-                "/home/me/.local/state/fnox-plugin-keepassxc/association.json"
+                "/home/me/.local/share/fnox-plugin-keepassxc/association.json"
             ))
         );
     }
 
     #[test]
-    fn state_path_is_none_without_xdg_or_home() {
-        assert_eq!(state_path(None, None), None);
+    fn data_path_is_none_without_xdg_or_home() {
+        assert_eq!(data_path(None, None), None);
     }
 
     #[test]

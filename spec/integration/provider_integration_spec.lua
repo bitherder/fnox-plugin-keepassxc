@@ -2,7 +2,7 @@
 -- real (non-mocked) fnox.cmd shim, proving provider.lua's get() hook calls
 -- through to the Rust client and maps its exit codes.
 --
--- The binary runs with an isolated, empty state directory (set up by
+-- The binary runs with an isolated, empty data directory (set up by
 -- scripts/test-integration.sh), so no association is stored. The client
 -- must report that as an auth error (exit 4), which get() forwards to
 -- fnox's auth_error hook.
