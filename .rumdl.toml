@@ -1,0 +1,34 @@
+# Project-wide Markdown linting and formatting.
+[global]
+flavor = "gfm" # GitHub Flavored Markdown
+
+[MD013] # Line length
+line-length = 100
+heading-line-length = 100
+code-blocks = false
+reflow = true
+
+[MD003] # ATX-style headings
+style = "atx"
+
+[MD004] # Asterisk unordered-list markers
+style = "asterisk"
+
+[MD007] # Four-space indentation for nested lists
+indent = 4
+
+[MD009] # Disallow trailing spaces
+strict = true
+
+[MD029] # Lazy numbering for ordered lists
+style = "one_or_ordered"
+
+[MD033] # No HTML tags
+table-allowed-elements = ["br"]
+
+[MD046] # Prefer fenced code blocks
+style = "fenced"
+
+[MD060] # Table format
+enabled = true
+style = "aligned" # Columns are padded with spaces for visual alignment
