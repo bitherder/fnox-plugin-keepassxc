@@ -16,6 +16,43 @@ management, **without decrypting the whole database in the calling process**.
 Starting scope: read-only retrieval of individual tokens via a running, unlocked KeePassXC.
 Writing secrets, TOTP, and headless/CI use are out of scope until the read path works.
 
+## Readiness checklist (live use)
+
+Goal: remove the tokens from `mise.toml` and read them through fnox. `[x]` is done; `[ ]` is
+open. Items marked **(you)** need your action in a live KeePassXC session. Details are in the
+sections named in brackets.
+
+Built:
+
+* [x] Protocol client: key exchange, association, `test-associate`, `get-logins` (pinned
+  `keepassxc-client` 0.1.0) [Option B]
+* [x] Exit-code contract shared by the Rust client and `provider.lua` [Tests that exist]
+* [x] Association stored as a `0600` file under `$XDG_DATA_HOME` [Option D]
+* [x] CLI: `--version`, `associate`, and `fnox://<name>` [Current code state]
+
+Verify live:
+
+* [ ] **(you)** Run `kpxc-client associate` with KeePassXC unlocked, and approve the prompt
+* [ ] **(you)** Run `kpxc-client fnox://<name>` for a test entry, then for a real token entry
+* [ ] **(you)** Tag each token entry in KeePassXC with a `fnox://<name>` URL [Option C]
+
+Wire up:
+
+* [ ] Make `kpxc-client` reachable: on PATH (for example `cargo install --path client`) or set
+  `client_bin` in the provider options [Known risks, item 9]
+* [ ] Run the plugin through the real fnox: `fnox provider test` and `fnox get` [Lua plugins]
+* [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
+* [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
+* [ ] Decide how fnox values reach the environment: `fnox exec` or a mise integration
+  [Known risks, item 9]
+* [ ] Decide the per-lookup prompt policy with Remember unticked [Known risks, item 4]
+* [ ] Optional: wire `auth_command` to `kpxc-client associate` [Lua plugins]
+
+Finish:
+
+* [ ] Remove the tokens from `mise.toml` once the checks above pass
+* [ ] Record the live results in the log
+
 ## Why not the built-in fnox `keepass` provider
 
 **Documented** ([fnox keepass provider](https://fnox.jdx.dev/providers/keepass.html)):
@@ -482,6 +519,11 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
 3. **Confirmation-dialog behaviour** for already-associated clients (Option D).
 4. **Prompting.** `get-logins` can pop a dialog in KeePassXC; a non-interactive `fnox hook-env`
    or `mise` activation must not hang. Decide on a timeout and clean failure.
+   **Finding (2026-11-20):** with **Remember** unticked (the chosen stance), each token entry
+   prompts on every lookup. Shell or `mise` activation that reads several tokens would prompt
+   several times. Options: accept the prompts, rely on fnox's `daemon_cache` (**unverified**
+   for this provider), or tick Remember for selected entries and accept the exposure. This
+   needs a decision before daily use.
 5. **Multiple databases / multiple matches.** `get-logins` can return several entries. Define
    behaviour (error on ambiguity is the safe default).
 6. **Test double.** The Lua-to-Rust integration test will need a fake KeePassXC on a real
@@ -495,6 +537,10 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
    (`mise` env integration versus `fnox exec`), and how mise installs the client binary.
    The user's first goal is environment variables for tokens; confirm the intended entry
    point.
+   **Finding (2026-11-20):** fnox is installed through mise, at
+   `~/.local/share/mise/installs/fnox/latest/fnox` (path confirmed with `which`).
+   `kpxc-client` is not on PATH, so `client_bin` or a PATH entry must be set before the
+   plugin can run.
 
 ## Next steps
 
@@ -662,3 +708,7 @@ Points to note:
 * Documented the association file's security tradeoff, the precautions, and its location. The
   README has a Security section, and Option D has the full detail. The **Remember** behaviour is
   taken from the 2.8.0 source reading and has not been checked live, so it is marked unverified.
+* Added a readiness checklist near the top of the plan, for getting to live use with tokens read
+  through fnox. Recorded two findings: with Remember unticked, each lookup prompts again, which
+  matters for `mise` activation (Known risks, item 4), and fnox is installed through mise, but
+  `kpxc-client` is not on PATH (Known risks, item 9).
