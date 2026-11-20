@@ -5,6 +5,7 @@
 
 use keepassxc_client::{KxcClient, KxcError, transport::Transport};
 
+pub mod cli;
 mod store;
 
 pub const EXIT_OK: i32 = 0;
