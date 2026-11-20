@@ -67,6 +67,34 @@ directly.
 * The protocol is handled by `keepassxc-client`, pinned exactly. This project
   owns no protocol code.
 
+## Security
+
+`kpxc-client associate` stores the association in
+`$XDG_DATA_HOME/fnox-plugin-keepassxc/association.json`. If `XDG_DATA_HOME` is
+unset, the path is `~/.local/share/fnox-plugin-keepassxc/association.json`. The
+app's directory is created with mode `0700`, and the file with `0600`.
+
+The file holds the association ID and the 32-byte identification key. Treat it as
+a credential. Any process running as your user can read it and ask a running,
+unlocked KeePassXC for entries tagged with `fnox://`. It does not expose the
+master password, or any entry without a `fnox://` URL. Unlike a macOS Keychain
+item, the file has no OS-level access control, so protection depends on the file
+permissions and on KeePassXC's per-entry approval.
+
+Precautions:
+
+* Keep KeePassXC locked when you are not using it. Lookups need it unlocked.
+* Leave the **Remember** checkbox in KeePassXC's access dialog unticked, so each
+  lookup asks for approval. Ticking it appears to save the approval, so later
+  lookups for that entry would not prompt. The source reading suggests this, but
+  it has not been checked live yet.
+* Tag only the entries you need, and prefer dedicated entries for fnox.
+* Do not put the file under version control, in a sync folder, or in a backup you
+  share. Your dotfiles repository must not track it.
+* To revoke access, delete the file and remove the association from KeePassXC's
+  Browser Integration settings. I have not yet confirmed the location of that
+  setting in your KeePassXC version.
+
 ## Layout
 
 * `provider.lua` — the fnox plugin entrypoint (must stay at repo root so

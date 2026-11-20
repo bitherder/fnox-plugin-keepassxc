@@ -232,6 +232,77 @@ interface. The location is data, not state, because the association is created b
 approval in KeePassXC, and losing it would surprise the user. Still open: whether one association
 is shared across projects or whether each project gets its own.
 
+#### Security tradeoff and precautions
+
+The file holds the association ID and the 32-byte identification key, so it is a bearer credential
+(see the source note above). The secret half is never sent on the wire, but the client needs it to
+rebuild the public key, so it has to be stored.
+
+Tradeoff, compared with a Keychain item:
+
+* Any process running as the same user can read the file and then ask a running, unlocked
+  KeePassXC for `fnox://` entries. The Keychain would add OS-level access control. The file has
+  none.
+* The exposure is limited to entries with a `fnox://` URL, and KeePassXC's per-entry approval still
+  applies. The master password is never in the file.
+* Same-user malware, root, and backups that copy the home directory can all read the file. The
+  file permissions do not protect against those.
+
+Precautions, as documented in the README:
+
+* Keep KeePassXC locked when not in use.
+* Leave **Remember** unticked in the access dialog, so each lookup needs approval. **Unverified:**
+  the plan's source reading (2.8.0) says ticking it saves the approval. That would make later
+  lookups silent. Check the dialog wording and behaviour during the live run, and update this
+  section and the README.
+* Tag only the entries that fnox needs.
+* Keep the file out of version control, sync folders, and shared backups.
+* To revoke, delete the file and remove the association from KeePassXC's Browser Integration
+  settings. **Unverified:** the location of that setting in the installed KeePassXC version.
+
+File handling, as implemented in `client/src/store.rs`: the app's directory is set to `0700`, and
+the file is `0600`, reset on every save. Parent directories such as `~/.local/share`, if they are
+created, use the default mode.
+
+#### Browser comparison (2026-11-20)
+
+The KeePassXC browser extension holds the same kind of credential, so it is a useful comparison.
+Sources:
+
+* Protocol spec,
+  [`keepassxc-protocol.md`](https://github.com/keepassxreboot/keepassxc-browser/blob/develop/keepassxc-protocol.md).
+  It describes the permanent identification key, says it "should be stored safely by the browser",
+  and notes that only the public half is used, which "might be a tiny flaw".
+* Extension permissions, in the
+  [`keepassxc-browser` README](https://github.com/keepassxreboot/keepassxc-browser). The `storage`
+  permission is "for storing extension settings (always stored locally in the browser, they are
+  never synced)".
+* Issue #1884,
+  [What goal does the protocol encryption serve?](https://github.com/keepassxreboot/keepassxc-browser/issues/1884).
+  The protocol's author says the identification token is "merely an identification token", and that
+  malware able to extract it from extension storage gets whatever keys are stored there. A
+  maintainer says connection keys should move to the OS keychain rather than browser local storage,
+  which has not happened yet.
+* Issue #4802,
+  [Document threat model of browser extension](https://github.com/keepassxreboot/keepassxc/issues/4802).
+  A project member says no software on a compromised machine can guarantee security. A comment in
+  the same thread says most clients, including many browser extensions, store these keys in
+  plaintext. That comment's author is not confirmed.
+* [`keepassxc-client` on crates.io](https://crates.io/crates/keepassxc-client), which advises
+  storing the identification secret in an OS keyring, not on disk in the clear.
+
+Findings:
+
+* The browser stores its identification key in the extension's own storage. Our file is the
+  equivalent. Neither is protected by more than the storage's own permissions. The browser storage
+  format is not verified from source.
+* Encryption on the native messaging channel protects against passive eavesdropping only. It does
+  not stop same-user malware. Per-entry approval in KeePassXC is the real consent boundary.
+* **Gap:** the extension sends the page URL in `get-logins`, and KeePassXC matches entries against
+  it, so a different site cannot ask for an unrelated login. Our client sends a `fnox://` name, and
+  any process holding the association can ask for any entry tagged that way. Tagging only the
+  entries fnox needs limits this, but it does not remove it.
+
 ## Live test database (specification)
 
 Dedicated KeePassXC database, never the real one. Use the Browser Integration settings and the
@@ -441,6 +512,17 @@ Proposed, pending the user's go-ahead on each:
 6. Add the read-only live check, run manually.
 7. Distribution through mise, and a worked `fnox.toml` plus `mise.toml` example.
 
+TODO items, not yet scheduled:
+
+* TODO: Add configuration that opts out of storing the credential mapping at all. With it set,
+  the client would not write the association, so there would be nothing on disk to read. Each
+  use would then need a fresh association, with the KeePassXC approval each time. Decide the
+  setting's name, its default, and where it is read from (environment variable or config file).
+* TODO: Look at the Rust library that abstracts OS-specific key storage, such as the `keyring`
+  crate, as a replacement for the file. It would cover the macOS Keychain, the Linux Secret
+  Service, and Windows Credential Manager. Check its maintenance and supply-chain risk before
+  adopting it, since it sits on the secrets path. Also check how each platform prompts for access.
+
 ## Re-evaluation (2026-11-20)
 
 Question asked: with KC handling the parts Lua cannot, do we still need Rust, and does the
@@ -574,3 +656,9 @@ Points to note:
 * Corrected two statements that were out of date. The CLI is wired (`685a492`), so the README and
   the "Current code state" paragraph no longer say the binary only echoes its input. The live check
   against KeePassXC is still pending.
+* Recorded how the browser extension stores its identification key, with links to the protocol
+  spec and to KeePassXC issues #1884 and #4802 (Option D). The gap it exposes is that our client
+  has no origin binding, so any process with the association can ask for any `fnox://` entry.
+* Documented the association file's security tradeoff, the precautions, and its location. The
+  README has a Security section, and Option D has the full detail. The **Remember** behaviour is
+  taken from the 2.8.0 source reading and has not been checked live, so it is marked unverified.
