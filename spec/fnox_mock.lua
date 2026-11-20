@@ -6,10 +6,11 @@
 -- `after_each`.
 
 local M = {
-	run_result = nil, -- { ok, stdout, stderr }
+	run_result = nil, -- { status, ok, stdout, stderr }
 	last_run_args = nil,
 	exec_error = nil,
 	last_exec_args = nil,
+	last_auth_error = nil,
 }
 
 package.loaded["fnox.cmd"] = {
@@ -28,7 +29,7 @@ package.loaded["fnox.cmd"] = {
 
 package.loaded["fnox"] = {
 	auth_error = function(message)
-		error({ auth_error = true, message = message })
+		M.last_auth_error = message
 	end,
 }
 

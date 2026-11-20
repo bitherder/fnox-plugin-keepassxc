@@ -40,6 +40,7 @@ function M.run(command)
 	os.remove(stderr_path)
 
 	return {
+		status = code,
 		ok = ok == true and code == 0,
 		stdout = stdout,
 		stderr = stderr,
