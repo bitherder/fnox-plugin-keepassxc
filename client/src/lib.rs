@@ -146,12 +146,28 @@ mod tests {
     }
 
     #[test]
+    fn maps_found_lookup_to_ok() {
+        assert_eq!(exit_code_for_lookup(&Lookup::Found("x".into())), EXIT_OK);
+    }
+
+    #[test]
+    fn maps_missing_entry_to_not_found() {
+        assert_eq!(exit_code_for_lookup(&Lookup::NotFound), EXIT_NOT_FOUND);
+    }
+
+    #[test]
+    fn maps_ambiguous_lookup_to_error() {
+        assert_eq!(exit_code_for_lookup(&Lookup::Ambiguous(2)), EXIT_ERROR);
+    }
+
+    #[test]
     fn exit_codes_are_distinct_and_ok_is_zero() {
         assert_eq!(EXIT_OK, 0);
         let codes = [
             EXIT_OK,
             EXIT_ERROR,
             EXIT_USAGE,
+            EXIT_NOT_FOUND,
             EXIT_AUTH_REQUIRED,
             EXIT_UNAVAILABLE,
         ];
