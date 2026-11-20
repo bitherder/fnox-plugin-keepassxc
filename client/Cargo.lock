@@ -192,6 +192,8 @@ name = "kpxc-client"
 version = "0.1.0"
 dependencies = [
  "keepassxc-client",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
