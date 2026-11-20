@@ -53,6 +53,17 @@ from now on.
 * Stage only the files that belong to the change, by name. Do not use
   `git add -A` or `git add .`.
 
+## Commit separation
+
+* Keep functional changes and non-functional changes in separate commits.
+  Functional changes are new tests and changes to code logic. Non-functional
+  changes are cosmetic edits and structural refactors, such as `rumdl`
+  reformatting, `cargo fmt`, renames, moves, and extractions that leave
+  behaviour unchanged.
+* Never mix the two in one commit, even when they touch the same file. Commit
+  the non-functional change first, so that the functional diff stays small and
+  reviewable.
+
 ## Markdown
 
 * Before committing any change to a `.md` file, run `rumdl check <files>`
