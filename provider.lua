@@ -21,8 +21,15 @@ function M.get(ctx, ref)
 	if result.ok then
 		return (result.stdout:gsub("\n$", ""))
 	end
-	if result.stderr:find("invalid reference", 1, true) then
+	if result.status == 1 or result.status == 2 then
 		error(result.stderr)
+	end
+	if result.status == 4 then
+		require("fnox").auth_error(result.stderr)
+		return nil
+	end
+	if result.status == 5 then
+		error("KeePassXC is not reachable: " .. result.stderr)
 	end
 	return nil
 end
