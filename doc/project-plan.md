@@ -67,11 +67,12 @@ fnox ──(Lua hook get(ctx, ref))──> provider.lua
 
 ### Current code state
 
-The client has `parse_reference`, the exit-code mapping (`exit_code_for`), and `lookup`, which
-resolves a name against KeePassXC through `keepassxc-client`. The `lookup` tests run against an
-in-process fake. `main.rs` still echoes the parsed name and is not wired to `lookup` yet (plan
-step 4). `provider.lua` maps the exit codes. No protocol code is written here; it comes from the
-library.
+The client has `parse_reference`, the exit-code mapping (`exit_code_for` and
+`exit_code_for_lookup`), and `lookup`, which resolves a name against KeePassXC through
+`keepassxc-client`. The `lookup` tests run against an in-process fake. The CLI in `cli.rs` supports
+`--version`, `associate`, and `fnox://<name>`, and it reads the stored association. `provider.lua`
+maps the exit codes. No protocol code is written here; it comes from the library. The CLI has not
+yet been run live against KeePassXC.
 
 ### Tests that exist
 
@@ -222,13 +223,14 @@ exactly when it prompts for a client that is already associated. Test this in th
 | macOS Keychain                      | Not readable by other processes without a prompt or ACL | More code; needs the Security framework or `security(1)` |
 | File under `~/.config/` with `0600` | Simple and inspectable                                  | Readable by anything running as the user                 |
 
-**Decided (2026-11-20): a `0600` file under `$XDG_STATE_HOME`.** It is
-`$XDG_STATE_HOME/fnox-plugin-keepassxc/association.json` (falling back to
-`$HOME/.local/state`), with the directory at `0700`. It holds the association id and the 32-byte
+**Decided (2026-11-20, revised the same day): a `0600` file under `$XDG_DATA_HOME`.** It is
+`$XDG_DATA_HOME/fnox-plugin-keepassxc/association.json` (falling back to
+`$HOME/.local/share`), with the directory at `0700`. It holds the association id and the 32-byte
 identification key, and it is a bearer credential. It is kept out of the dotfiles repo, and it
 works the same on macOS and Linux with no prompts. The Keychain stays an option behind the same
-interface. Still open: whether one association is shared across projects or whether each project
-gets its own.
+interface. The location is data, not state, because the association is created by the user's
+approval in KeePassXC, and losing it would surprise the user. Still open: whether one association
+is shared across projects or whether each project gets its own.
 
 ## Live test database (specification)
 
@@ -433,7 +435,8 @@ Proposed, pending the user's go-ahead on each:
 2. Add the error-to-exit-code mapping and its unit tests.
 3. Add lookup-logic tests in-process with `MockTransport` (see the table above).
 4. Replace the echo stub with a real `get_logins` lookup and an `associate` subcommand.
-   Wire `associate` to `auth_command` in the Lua provider.
+   Wire `associate` to `auth_command` in the Lua provider. The CLI part is done (see the
+   2026-11-20 log). The `auth_command` wiring in the Lua provider is not.
 5. Rewrite the Lua-to-Rust integration test for the real exit-code contract.
 6. Add the read-only live check, run manually.
 7. Distribution through mise, and a worked `fnox.toml` plus `mise.toml` example.
@@ -560,3 +563,14 @@ Points to note:
 * Known gaps: `6f4c16c` includes a one-line `rustfmt` change in new code, which `AGENTS.md`
   would normally keep in its own commit. `scripts/test-integration.sh` leaves two temporary
   directories behind on each run, because `exec` replaces the shell.
+
+### 2026-11-20 (later)
+
+* Moved the association file from `$XDG_STATE_HOME` to `$XDG_DATA_HOME`, with the fallback at
+  `$HOME/.local/share`. The association is created by the user's approval in KeePassXC, so losing
+  it would surprise the user. That makes it user data, not state, by the XDG spec's distinction.
+  The earlier entries above that name `$XDG_STATE_HOME` describe the state. They are not
+  rewritten. Commits: `a4ff139` (red) and `82e6345` (green).
+* Corrected two statements that were out of date. The CLI is wired (`685a492`), so the README and
+  the "Current code state" paragraph no longer say the binary only echoes its input. The live check
+  against KeePassXC is still pending.

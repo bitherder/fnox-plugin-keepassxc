@@ -19,19 +19,17 @@ Working:
 
 * The Lua provider maps the client's exit codes to fnox behaviour. Exit 4
   calls `fnox.auth_error` when the database is locked or not associated.
-* The Rust client parses `fnox://<name>` references, maps errors to exit
-  codes, and implements a lookup against KeePassXC through the
-  `keepassxc-client` crate. The lookup is tested in-process against a fake
-  KeePassXC.
+* The Rust client has `associate` and `fnox://<name>` commands, built on the
+  `keepassxc-client` crate. The association is stored in a `0600` file under
+  `$XDG_DATA_HOME`. Exit codes cover every failure path, and the lookup is
+  tested in-process against a fake KeePassXC.
 * Live `fnox://` lookups against KeePassXC 2.8.0 were checked on a dedicated
-  test database.
+  test database. Those checks predate the CLI and used a throwaway crate.
 
 Not yet done:
 
-* The client binary still echoes the parsed name. It is not wired to real
-  lookups or to `associate`.
-* Where the association is stored (macOS Keychain or a `0600` file) is
-  undecided.
+* The CLI has not yet been run live against KeePassXC: `associate` and a
+  `fnox://` lookup through the built binary.
 
 See [doc/project-plan.md](doc/project-plan.md) for the plan, decision log, and
 open questions.
