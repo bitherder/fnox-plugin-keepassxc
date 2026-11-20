@@ -62,6 +62,31 @@ mod tests {
     }
 
     #[test]
+    fn maps_missing_socket_to_unavailable() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::SocketNotFound("x".into())),
+            EXIT_UNAVAILABLE
+        );
+    }
+
+    #[test]
+    fn maps_closed_connection_to_unavailable() {
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::ConnectionClosed),
+            EXIT_UNAVAILABLE
+        );
+    }
+
+    #[test]
+    fn maps_io_failure_to_unavailable() {
+        let io = std::io::Error::other("connection refused");
+        assert_eq!(
+            exit_code_for(&keepassxc_client::KxcError::Io(io)),
+            EXIT_UNAVAILABLE
+        );
+    }
+
+    #[test]
     fn exit_codes_are_distinct_and_ok_is_zero() {
         assert_eq!(EXIT_OK, 0);
         let codes = [
