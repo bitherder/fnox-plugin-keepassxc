@@ -32,14 +32,15 @@ Built:
 
 Verify live:
 
-* [ ] **(you)** Run `kpxc-client associate` with KeePassXC unlocked, and approve the prompt
-* [ ] **(you)** Run `kpxc-client fnox://<name>` for a test entry, then for a real token entry
+* [x] **(you)** Run `kpxc-client associate` with KeePassXC unlocked, and approve the prompt
+* [x] **(you)** Run `kpxc-client fnox://<name>` for a test entry, then for a real token entry
 * [ ] **(you)** Tag each token entry in KeePassXC with a `fnox://<name>` URL [Option C]
 
 Wire up:
 
-* [ ] Add a `build` mise task that builds `client/target/release/kpxc-client`, and check that the
-  plugin finds it by the lookup order in [Binary location and wiring]
+* [x] Add a `build` mise task (`mise run build`) that builds `client/target/release/kpxc-client`
+* [ ] Check that the plugin finds that binary through the lookup order in
+  [Binary location and wiring]
 * [ ] Run the plugin through the real fnox: `fnox provider test` and `fnox get` [Lua plugins]
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
 * [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
@@ -765,3 +766,10 @@ Points to note:
   git source), in [Binary location and wiring](#binary-location-and-wiring). Two points are
   unverified: whether the Lua environment can check for a file, and whether `auth_command` can
   reach a binary in the plugin directory.
+* Live steps, recorded as complete by the user on 2026-11-23: `kpxc-client associate`, approved in
+  KeePassXC, and `kpxc-client fnox://<name>` for a test entry and for a real token entry. The
+  output was not captured in this session, so no lookup values are recorded here. The
+  readiness checklist ticks these two steps only. Tagging each token entry is still open.
+* Added the `build` mise task. It builds the release binary into `client/target/release`, the
+  path D12 searches. That directory is already git-ignored. The existing `test:lua` and
+  `test:rust` tasks pass through mise, and `test` runs both plus the integration suite.
