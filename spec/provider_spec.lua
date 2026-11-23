@@ -1,6 +1,8 @@
 local fnox_mock = require("spec.fnox_mock")
 
 describe("provider.get", function()
+	local original_io_open = io.open
+
 	-- reload provider.lua fresh each time so module-level requires re-resolve
 	-- against the current mock state
 	local function load_provider()
@@ -16,6 +18,7 @@ describe("provider.get", function()
 	end
 
 	after_each(function()
+		io.open = original_io_open
 		fnox_mock.run_result = nil
 		fnox_mock.last_run_args = nil
 		fnox_mock.last_auth_error = nil
@@ -31,11 +34,43 @@ describe("provider.get", function()
 		assert.same({ "kpxc-client", "fnox://github-token" }, fnox_mock.last_run_args.command)
 	end)
 
+	it("uses the plugin-local client binary when it exists", function()
+		fnox_mock.run_result = { status = 0, ok = true, stdout = "x\n", stderr = "" }
+		local plugin_dir = "/plugin"
+		local client_path = plugin_dir .. "/client/target/release/kpxc-client"
+		io.open = function(path)
+			if path == client_path then
+				return { close = function() end }
+			end
+			return nil
+		end
+		local provider = load_provider()
+
+		provider.get({ plugin_dir = plugin_dir, options = {} }, "fnox://x")
+
+		assert.equal(client_path, fnox_mock.last_run_args.command[1])
+	end)
+
+	it("falls back to the client binary on PATH when plugin-local binary is absent", function()
+		fnox_mock.run_result = { status = 0, ok = true, stdout = "x\n", stderr = "" }
+		io.open = function()
+			return nil
+		end
+		local provider = load_provider()
+
+		provider.get({ plugin_dir = "/plugin", options = {} }, "fnox://x")
+
+		assert.equal("kpxc-client", fnox_mock.last_run_args.command[1])
+	end)
+
 	it("uses options.client_bin when set", function()
 		fnox_mock.run_result = { status = 0, ok = true, stdout = "x\n", stderr = "" }
 		local provider = load_provider()
 
-		provider.get({ options = { client_bin = "./target/debug/kpxc-client" } }, "fnox://x")
+		provider.get({
+			plugin_dir = "/plugin",
+			options = { client_bin = "./target/debug/kpxc-client" },
+		}, "fnox://x")
 
 		assert.equal("./target/debug/kpxc-client", fnox_mock.last_run_args.command[1])
 	end)
