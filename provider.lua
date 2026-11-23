@@ -10,10 +10,26 @@ local cmd = require("fnox.cmd")
 
 local M = {}
 
--- Resolves ctx.options.client_bin, defaulting to a bare command name so it
--- just needs to be on PATH.
+-- Prefer configured client, then plugin-local binary, then PATH.
 local function client_bin(ctx)
-	return (ctx.options and ctx.options.client_bin) or "kpxc-client"
+	local configured = ctx.options and ctx.options.client_bin
+	if configured then
+		return configured
+	end
+
+	if ctx.plugin_dir then
+		local separator = package.config and package.config:sub(1, 1) or "/"
+		local suffix = ctx.plugin_dir:sub(-1) == separator and "" or separator
+		local path = ctx.plugin_dir .. suffix .. "client" .. separator .. "target"
+			.. separator .. "release" .. separator .. "kpxc-client"
+		local file = io.open(path, "rb")
+		if file then
+			file:close()
+			return path
+		end
+	end
+
+	return "kpxc-client"
 end
 
 function M.get(ctx, ref)
