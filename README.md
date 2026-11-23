@@ -13,7 +13,8 @@ protocol. Only entries explicitly tagged for exposure, through a
 
 ## Status
 
-Design and exploration stage.
+Design and exploration stage. The association and lookups have been run live
+against KeePassXC.
 
 Working:
 
@@ -23,13 +24,14 @@ Working:
   `keepassxc-client` crate. The association is stored in a `0600` file under
   `$XDG_DATA_HOME`. Exit codes cover every failure path, and the lookup is
   tested in-process against a fake KeePassXC.
-* Live `fnox://` lookups against KeePassXC 2.8.0 were checked on a dedicated
-  test database. Those checks predate the CLI and used a throwaway crate.
+* On 2026-11-23 the owner ran `associate`, approved it in KeePassXC, and ran
+  `fnox://` lookups for a test entry and a real token entry.
 
 Not yet done:
 
-* The CLI has not yet been run live against KeePassXC: `associate` and a
-  `fnox://` lookup through the built binary.
+* Tagging every token entry with a `fnox://` URL.
+* Running the plugin through fnox itself (`fnox provider test`).
+* Release tags and published binaries. See [Releases](#releases).
 
 See [doc/project-plan.md](doc/project-plan.md) for the plan, decision log, and
 open questions.
@@ -105,15 +107,57 @@ Precautions:
 
 ## Development
 
-Tool versions are pinned via `mise` (see `mise.toml`).
+Tool versions are pinned in `mise.toml`. Run `mise install` once.
+
+### Tasks
+
+| Task                        | What it does                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `mise run build`            | Builds the release binary into `client/target/release/kpxc-client`.             |
+| `mise run test`             | Runs the Lua unit suite, the Rust tests, and the Lua-to-Rust integration suite. |
+| `mise run test:lua`         | Runs the Lua unit suite in `spec/` with busted.                                 |
+| `mise run test:rust`        | Runs the Rust unit and integration tests with `cargo test`.                     |
+| `mise run test:integration` | Builds the debug binary and runs the Lua-to-Rust integration suite.             |
+
+The Lua suites need busted in the project-local LuaRocks tree. Install it once:
 
 ```sh
-mise install
-
-# Rust
-cd client && cargo test
-
-# Lua (uses a project-local LuaRocks tree for dev-only deps)
-mise exec -- luarocks --tree=lua_modules install busted   # once
-./scripts/test-lua.sh
+mise exec -- luarocks --tree=lua_modules install busted
 ```
+
+The integration suite runs `client/target/debug/kpxc-client` by default. Set
+`KPXC_CLIENT_BIN` to use a different binary. It runs with temporary `HOME` and
+`XDG_DATA_HOME` directories, so it never reads your association file.
+
+### Building the client
+
+`mise run build` writes the release binary to `client/target/release/`, which
+is git-ignored. `provider.lua` is designed to look for the binary in this order,
+and the first match wins:
+
+1. The `client_bin` provider option, if set.
+2. `<plugin_dir>/client/target/release/kpxc-client`.
+3. `kpxc-client` on `PATH`.
+
+The lookup order is the design. Whether fnox's Lua environment can check for
+the file is not yet verified.
+
+### Releases
+
+No releases are published yet. The repository has no git tags, and no release
+binaries are attached anywhere. Release binaries are deferred (plan decision D12).
+
+fnox does not build git-installed plugins. Anyone who installs a plugin from git
+must run `mise run build` in the plugin's directory before the plugin can find the
+binary.
+
+The intended release procedure is manual, and it has not been exercised yet:
+
+1. Run `mise run test` and check that everything passes.
+2. Update `version` in `client/Cargo.toml`.
+3. Run `mise run build`, and check that `client/target/release/kpxc-client --version`
+   prints the new version.
+4. Commit the version change, then tag that commit `vX.Y.Z`.
+5. Push the commit and the tag.
+6. Users pin the tag in `[plugins]`, for example
+   `keepassxc = "bitherder/fnox-plugin-keepassxc#vX.Y.Z"`.
