@@ -19,3 +19,7 @@ run = "cargo test --manifest-path client/Cargo.toml"
 [tasks."test:integration"]
 description = "Build the real client and verify the Lua provider calls it end to end"
 run = "./scripts/test-integration.sh"
+
+[tasks.build]
+description = "Build the release kpxc-client into client/target/release, the path provider.lua searches"
+run = "cargo build --release --manifest-path client/Cargo.toml"
