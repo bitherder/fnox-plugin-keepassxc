@@ -13,8 +13,8 @@ protocol. Only entries explicitly tagged for exposure, through a
 
 ## Status
 
-Design and exploration stage. The association and lookups have been run live
-against KeePassXC.
+Prototype, pre-release. The association and lookups have been run live against
+KeePassXC, but the plugin has not yet been tested through real fnox.
 
 Working:
 
@@ -25,12 +25,16 @@ Working:
   `$XDG_DATA_HOME`. Exit codes cover every failure path, and the lookup is
   tested in-process against a fake KeePassXC.
 * On 2026-11-23 the owner ran `associate`, approved it in KeePassXC, and ran
-  `fnox://` lookups for a test entry and a real token entry.
+  `fnox://` lookups for a test entry and a real token entry. Secret output was
+  not recorded here.
 
 Not yet done:
 
 * Tagging every token entry with a `fnox://` URL.
-* Running the plugin through fnox itself (`fnox provider test`).
+* Running the plugin through fnox itself (`fnox provider test`, `fnox get`).
+* Configuring the current binary path (`client_bin` or PATH); plugin-relative
+  lookup is not implemented.
+* Choosing the fnox plugin source and how resolved values reach the environment.
 * Release tags and published binaries. See [Releases](#releases).
 
 See [doc/project-plan.md](doc/project-plan.md) for the plan, decision log, and
@@ -132,24 +136,34 @@ The integration suite runs `client/target/debug/kpxc-client` by default. Set
 ### Building the client
 
 `mise run build` writes the release binary to `client/target/release/`, which
-is git-ignored. `provider.lua` is designed to look for the binary in this order,
-and the first match wins:
+is git-ignored. **The provider does not discover that path yet.** Current
+`provider.lua` uses `options.client_bin` if set, otherwise runs the bare command
+`kpxc-client` from `PATH`.
 
-1. The `client_bin` provider option, if set.
-2. `<plugin_dir>/client/target/release/kpxc-client`.
-3. `kpxc-client` on `PATH`.
+For a local build, set `client_bin` to the full path of the built binary:
 
-The lookup order is the design. Whether fnox's Lua environment can check for
-the file is not yet verified.
+```toml
+[providers.keepassxc]
+type = "lua"
+plugin = "keepassxc"
+options = { client_bin = "/path/to/fnox-plugin-keepassxc/client/target/release/kpxc-client" }
+auth_command = "/path/to/fnox-plugin-keepassxc/client/target/release/kpxc-client associate"
+```
+
+The planned fallback is `options.client_bin`, then
+`<plugin_dir>/client/target/release/kpxc-client`, then PATH. That lookup is not
+implemented or tested yet. The `auth_command` is run by fnox outside the plugin,
+so it also needs an explicit path or a binary on PATH.
 
 ### Releases
 
 No releases are published yet. The repository has no git tags, and no release
 binaries are attached anywhere. Release binaries are deferred (plan decision D12).
 
-fnox does not build git-installed plugins. Anyone who installs a plugin from git
-must run `mise run build` in the plugin's directory before the plugin can find the
-binary.
+fnox does not build git-installed plugins. A user installing from git must run
+`mise run build` in the plugin directory and, with the current provider code,
+set `options.client_bin` or put the binary on PATH. Building alone does not make
+the plugin find it.
 
 The intended release procedure is manual, and it has not been exercised yet:
 

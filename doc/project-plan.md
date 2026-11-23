@@ -39,9 +39,9 @@ Verify live:
 Wire up:
 
 * [x] Add a `build` mise task (`mise run build`) that builds `client/target/release/kpxc-client`
-* [ ] Check that the plugin finds that binary through the lookup order in
-  [Binary location and wiring]
-* [ ] Run the plugin through the real fnox: `fnox provider test` and `fnox get` [Lua plugins]
+* [ ] Either implement plugin-relative lookup as designed in [Binary location and wiring], or
+  configure `client_bin`/PATH. Current `provider.lua` does not search `ctx.plugin_dir`.
+* [ ] Run the plugin through real fnox: `fnox provider test` and `fnox get` [Lua plugins]
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
 * [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
 * [ ] Decide how fnox values reach the environment: `fnox exec` or a mise integration
@@ -52,7 +52,8 @@ Wire up:
 Finish:
 
 * [ ] Remove the tokens from `mise.toml` once the checks above pass
-* [ ] Record the live results in the log
+* [x] Record that live associate and lookup steps were completed. Exact output was not captured;
+  no secret values are logged.
 
 ## Why not the built-in fnox `keepass` provider
 
@@ -67,20 +68,20 @@ That is the discomfort this project exists to avoid.
 
 ## Decisions
 
-| #   | Decision                                                                                                                                                                                | Date       | Notes                                                                                                                                                 |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user                                                | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                                                 |
-| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                                                                       | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                                               |
-| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>`                                                | 2026-11-19 |                                                                                                                                                       |
-| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                                                                | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                                                      |
-| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                                                                             | 2026-11-19 | User choice; it is a protocol client                                                                                                                  |
-| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                                                               | 2026-11-19 |                                                                                                                                                       |
-| D7  | Automated tests first, for both Lua and Rust                                                                                                                                            | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                                               |
-| D8  | Rust for the client                                                                                                                                                                     | 2026-11-19 | Single static binary, installable via mise                                                                                                            |
-| D9  | Do not re-implement the protocol; use an existing crate                                                                                                                                 | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                                                        |
-| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                                                                             | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                                            |
-| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                                                                            | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)                                    |
-| D12 | Find the client binary relative to the plugin: `client_bin` option, then `<plugin_dir>/client/target/release/kpxc-client`, then PATH. Build it with a mise task. Defer release binaries | 2026-11-20 | Git-installed plugins have no build step, so a linked checkout is the development path. See [Binary location and wiring](#binary-location-and-wiring) |
+| #   | Decision                                                                                                                                                     | Date       | Notes                                                                                                                                                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user                     | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                                                                |
+| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                                            | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                                                              |
+| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>`                     | 2026-11-19 |                                                                                                                                                                      |
+| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                                     | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                                                                     |
+| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                                                  | 2026-11-19 | User choice; it is a protocol client                                                                                                                                 |
+| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                                    | 2026-11-19 |                                                                                                                                                                      |
+| D7  | Automated tests first, for both Lua and Rust                                                                                                                 | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                                                              |
+| D8  | Rust for the client                                                                                                                                          | 2026-11-19 | Single static binary, installable via mise                                                                                                                           |
+| D9  | Do not re-implement the protocol; use an existing crate                                                                                                      | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                                                                       |
+| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                                                  | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                                                           |
+| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                                                 | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)                                                   |
+| D12 | Planned binary lookup order: `client_bin`, then `<plugin_dir>/client/target/release/kpxc-client`, then PATH. Build locally with mise; defer release binaries | 2026-11-20 | `provider.lua` currently implements only `client_bin`, then PATH. Plugin-relative lookup remains work. See [Binary location and wiring](#binary-location-and-wiring) |
 
 ## Architecture (current intent)
 
@@ -106,19 +107,21 @@ fnox ──(Lua hook get(ctx, ref))──> provider.lua
 
 ### Binary location and wiring
 
-`provider.lua` finds the client binary in this order, and the first match wins:
+**Current implementation:** `provider.lua` runs `ctx.options.client_bin` when set, otherwise the
+bare command `kpxc-client` (which must be on PATH). It does not inspect `ctx.plugin_dir` and does
+not find `client/target/release/kpxc-client` automatically. `mise run build` creates that local
+binary, but does not by itself make it available to fnox.
+
+**Planned lookup order:**
 
 1. The `client_bin` provider option, if set.
-2. `<plugin_dir>/client/target/release/kpxc-client`. fnox documents `ctx.plugin_dir`, so this works
-   for a linked checkout, and for a git install that someone has built in place.
+2. `<plugin_dir>/client/target/release/kpxc-client`.
 3. `kpxc-client` on PATH.
 
-If none is found, `provider.lua` raises an error that names the build command. The build is a
-mise task in the repo, which does not exist yet. Release binaries are deferred. Git installs have
-no build step, so that case still needs the build run in the plugin's directory.
-
-**Unverified:** whether the fnox Lua environment can check that a file exists. If it cannot, the
-lookup needs another route.
+The release binary is built locally with `mise run build`. Git installs have no build step, so
+users must build within the clone and, until planned lookup is implemented, configure
+`options.client_bin` or put the binary on PATH. Whether the fnox Lua runtime exposes a usable file
+check is still unverified.
 
 Development, from a linked checkout:
 
@@ -127,6 +130,7 @@ Development, from a linked checkout:
 [providers.keepassxc]
 type = "lua"
 plugin = "keepassxc"   # the name given to `fnox plugin link`
+options = { client_bin = "<checkout>/client/target/release/kpxc-client" }
 auth_command = "<checkout>/client/target/release/kpxc-client associate"
 
 [secrets]
@@ -136,7 +140,8 @@ GITHUB_TOKEN = { provider = "keepassxc", value = "fnox://github-token" }
 Run `fnox plugin link keepassxc ~/Projects/fnox-plugin-keepassxc` once. Then
 `fnox provider test keepassxc` checks that the plugin loads.
 
-Sharing, from a git source:
+Sharing, from a git source (the client binary must separately be built and made available by
+`client_bin` or PATH):
 
 ```toml
 [plugins]
@@ -156,16 +161,18 @@ The client has `parse_reference`, the exit-code mapping (`exit_code_for` and
 `exit_code_for_lookup`), and `lookup`, which resolves a name against KeePassXC through
 `keepassxc-client`. The `lookup` tests run against an in-process fake. The CLI in `cli.rs` supports
 `--version`, `associate`, and `fnox://<name>`, and it reads the stored association. `provider.lua`
-maps the exit codes. No protocol code is written here; it comes from the library. The CLI has not
-yet been run live against KeePassXC.
+maps exit codes. No protocol code is written here; it comes from the library. The user reports
+running `associate` and lookups for a test entry and a real token against live KeePassXC on
+2026-11-23; exact output was not captured. Running the Lua provider through real fnox remains
+untested.
 
 ### Tests that exist
 
-| Suite                   | Command                                        | What it covers                             | Status after KC decision                                                    |
-| ----------------------- | ---------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
-| Lua unit (busted)       | `./scripts/test-lua.sh`                        | `provider.get` against a mocked `fnox.cmd` | Keep. Re-target at the exit-code contract                                   |
-| Rust unit               | `cargo test --manifest-path client/Cargo.toml` | reference parsing                          | Keep. Add error-to-exit-code mapping                                        |
-| Lua-to-Rust integration | `./scripts/test-integration.sh`                | real binary against the echo stub          | **Must change.** Asserts the stub's echo; will fail once real lookups exist |
+| Suite                   | Command                                        | What it covers                               | Status after KC decision                                    |
+| ----------------------- | ---------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------- |
+| Lua unit (busted)       | `./scripts/test-lua.sh`                        | `provider.get` against a mocked `fnox.cmd`   | Covers success and exit-code mapping                        |
+| Rust unit               | `cargo test --manifest-path client/Cargo.toml` | parsing, error mapping, CLI and lookup logic | Passing; includes store and lookup tests                    |
+| Lua-to-Rust integration | `./scripts/test-integration.sh`                | real binary without a KeePassXC dependency   | Covers invalid reference and missing-association auth error |
 
 See [Re-evaluation](#re-evaluation-2026-11-20) for the proposed target structure.
 
@@ -559,52 +566,48 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
 
 ## Known risks and open questions
 
-1. **Custom-scheme URL matching** (Option C). Could force a different reference scheme.
-2. **macOS behaviour of both crates.** The socket exists at
-   `$TMPDIR/org.keepassxc.KeePassXC.BrowserServer` (mode `srwx------`, **verified** on this
-   machine, KeePassXC at `/Applications/KeePassXC.app`), and both crates resolve that path
-   in source, but neither has been run here.
-3. **Confirmation-dialog behaviour** for already-associated clients (Option D).
+1. **Custom-scheme URL matching** (Option C) is verified live on KeePassXC 2.8.0: `fnox://`
+   lookups matched primary and additional URLs. The `keepassxc://by-path/` selector also worked
+   for entries with a URL. Keep lowercase, hyphenated names; dots can widen host matching.
+2. **macOS transport** is verified live with `keepassxc-client` on this machine: socket discovery,
+   association, and lookups worked. `keepassxc-proxy-lib` was not used and is no longer a candidate.
+3. **Confirmation-dialog behaviour** for already-associated clients (Option D), especially the
+   effect of **Remember**, is not confirmed live.
 4. **Prompting.** `get-logins` can pop a dialog in KeePassXC; a non-interactive `fnox hook-env`
    or `mise` activation must not hang. Decide on a timeout and clean failure.
-   **Finding (2026-11-20):** with **Remember** unticked (the chosen stance), each token entry
-   prompts on every lookup. Shell or `mise` activation that reads several tokens would prompt
-   several times. Options: accept the prompts, rely on fnox's `daemon_cache` (**unverified**
-   for this provider), or tick Remember for selected entries and accept the exposure. This
-   needs a decision before daily use.
-5. **Multiple databases / multiple matches.** `get-logins` can return several entries. Define
-   behaviour (error on ambiguity is the safe default).
-6. **Test double.** The Lua-to-Rust integration test will need a fake KeePassXC on a real
-   Unix socket. Neither library provides one (keepassxc-client's is a private in-process
-   mock), so we will write the server half of the crypto once. Worth offering upstream.
+   **Source-supported, not confirmed live:** with **Remember** unticked (the chosen stance), each
+   token entry should prompt on every lookup. Shell or `mise` activation that reads several tokens
+   would prompt several times. Options: accept the prompts, rely on fnox's `daemon_cache`
+   (**unverified** for this provider), or tick Remember for selected entries and accept the
+   exposure. Decide before daily use.
+5. **Multiple databases / multiple matches.** Multiple matches map to an ambiguity error in the
+   client and are covered by in-process tests. Confirm KeePassXC's "search in all databases"
+   setting and the intended database behavior for daily use.
+6. **Test double resolved:** lookup tests use `keepassxc-client`'s `MockTransport` with an
+   in-process fake KeePassXC responder. The Lua/Rust integration test covers the process boundary
+   without a KeePassXC socket.
 7. **Supply chain.** Young, single-maintainer crates on a secrets path. Pin and audit.
 8. **Secret exposure in our own process.** The client prints the secret on stdout and fnox
    puts it in the environment. Avoid logging it; consider zeroizing buffers. Review before
    release.
-9. **mise integration.** Not yet designed: how fnox values reach mise
-   (`mise` env integration versus `fnox exec`), and how mise installs the client binary.
-   The user's first goal is environment variables for tokens; confirm the intended entry
-   point.
-   **Finding (2026-11-20):** fnox is installed through mise, at
-   `~/.local/share/mise/installs/fnox/latest/fnox` (path confirmed with `which`).
-   `kpxc-client` is not on PATH. Decision D12 locates the binary relative to the plugin, see
-   [Binary location and wiring](#binary-location-and-wiring).
+9. **fnox/mise wiring.** The real fnox plugin has not been tested. Choose between `fnox exec` and
+   mise's env integration for putting values in program environments. `fnox` is installed through
+   mise on this machine; `kpxc-client` is not on PATH. Current `provider.lua` therefore requires
+   `options.client_bin` or a PATH entry. Plugin-relative lookup is planned in D12, not implemented.
 
 ## Next steps
 
-Proposed, pending the user's go-ahead on each:
+The original prototype steps are complete. Remaining work to use fnox for tokens:
 
-1. **Live spike** (needs the user): unlock KeePassXC, tag one test entry with a `fnox://`
-   URL, approve the association once, then call `get-logins` with that URL and with an
-   `https://` URL. Record the results and settle Option C and Option D.
-2. Add the error-to-exit-code mapping and its unit tests.
-3. Add lookup-logic tests in-process with `MockTransport` (see the table above).
-4. Replace the echo stub with a real `get_logins` lookup and an `associate` subcommand.
-   Wire `associate` to `auth_command` in the Lua provider. The CLI part is done (see the
-   2026-11-20 log). The `auth_command` wiring in the Lua provider is not.
-5. Rewrite the Lua-to-Rust integration test for the real exit-code contract.
-6. Add the read-only live check, run manually.
-7. Distribution through mise, and a worked `fnox.toml` plus `mise.toml` example.
+1. **Make the binary available to the provider.** Configure `options.client_bin` or PATH now;
+   optionally implement the plugin-relative fallback in D12.
+2. Link the local checkout with `fnox plugin link`, add the provider and token references to a
+   `fnox.toml`, then run `fnox provider test` and `fnox get` against a tagged test entry.
+3. Decide how resolved values reach applications: `fnox exec` or mise env integration.
+4. Decide prompt policy with **Remember** unticked; several lookups may mean several prompts.
+5. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
+6. Remove token values from `mise.toml` after the real fnox flow passes.
+7. Add release tags and a published release only when release distribution is needed.
 
 TODO items, not yet scheduled:
 
@@ -760,12 +763,12 @@ Points to note:
   through fnox. Recorded two findings: with Remember unticked, each lookup prompts again, which
   matters for `mise` activation (Known risks, item 4), and fnox is installed through mise, but
   `kpxc-client` is not on PATH (Known risks, item 9).
-* Decided D12: the client binary is found relative to the plugin (`client_bin`, then
-  `<plugin_dir>/client/target/release/kpxc-client`, then PATH), with a mise build task. Release
-  binaries are deferred. Added the wiring for development (`fnox plugin link`) and for sharing (a
-  git source), in [Binary location and wiring](#binary-location-and-wiring). Two points are
-  unverified: whether the Lua environment can check for a file, and whether `auth_command` can
-  reach a binary in the plugin directory.
+* Decided D12's intended lookup order: `client_bin`, then
+  `<plugin_dir>/client/target/release/kpxc-client`, then PATH. Added the mise build task and
+  documented development (`fnox plugin link`) and git-source wiring. Review on 2026-11-23 found
+  that only `client_bin` and PATH are implemented; plugin-relative lookup remains open. Whether
+  fnox Lua can check for a file is unverified. `auth_command` needs its own path because fnox runs
+  it outside the plugin.
 * Live steps, recorded as complete by the user on 2026-11-23: `kpxc-client associate`, approved in
   KeePassXC, and `kpxc-client fnox://<name>` for a test entry and for a real token entry. The
   output was not captured in this session, so no lookup values are recorded here. The
@@ -773,3 +776,17 @@ Points to note:
 * Added the `build` mise task. It builds the release binary into `client/target/release`, the
   path D12 searches. That directory is already git-ignored. The existing `test:lua` and
   `test:rust` tasks pass through mise, and `test` runs both plus the integration suite.
+
+### 2026-11-23
+
+* The user reports completing live association and lookup with the local CLI: one test entry and
+  one real token entry. Exact command output and values were not captured, and no secret is
+  recorded here. The readiness checklist marks the reported steps done; tagging every token and
+  testing through real fnox remain open.
+* Reviewed docs against the code. Corrected the binary lookup description: `provider.lua` uses
+  `options.client_bin`, otherwise bare `kpxc-client` on PATH. It does not search `ctx.plugin_dir`
+  or `client/target/release` yet. The mise build task creates a local release binary, but fnox does
+  not discover it automatically.
+* Refreshed the known risks and next steps. `fnox://` matching, macOS transport, lookup tests, and
+  process-boundary tests are verified; real fnox configuration, binary discovery, prompt policy,
+  and environment handoff remain open.
