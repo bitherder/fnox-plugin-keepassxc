@@ -18,7 +18,10 @@ KeePassXC. The provider passes `fnox provider test` using a local plugin
 directory and its plugin-local release binary. The user also reports that
 `fnox get` retrieved the test-entry value and successfully ran `auth_command`
 to create a fresh association. A mise task also received the test value, checked
-it was nonempty, and did not print it. Use by a real application and
+it was nonempty, and did not print it. With `FNOX_DAEMON=on`, the test task ran
+without a KeePassXC prompt; with it off, the task prompted. The current mise
+build has a protocol mismatch for its direct socket path, so this project accepts
+the fnox CLI fallback and its daemon cache. Use by a real application and
 `fnox exec` remain untested.
 
 Working:
@@ -92,6 +95,11 @@ use the cache until it expires or the daemon stops. The daemon does not write
 cached values to disk, but other processes running as the same user can request
 them. mise reads directly from the daemon only on a cache hit; on a miss it asks
 fnox to resolve the value.
+
+The locally installed mise 2026.10.17 embeds `fnox-client` 1.40.0 (wire
+protocol 6), while fnox 1.50.0 uses protocol 8. The socket name includes the
+protocol version, so direct socket access is mismatched. The tested CLI fallback
+still uses fnox's daemon cache; no downgrade or socket-path override is needed.
 
 Mise does not connect stdin to a task that receives secrets by default. If the
 task needs interactive stdin, set `interactive = true`; its output then goes

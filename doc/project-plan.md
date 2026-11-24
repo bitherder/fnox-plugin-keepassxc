@@ -45,6 +45,8 @@ Wire up:
 * [x] Implement plugin-relative lookup and verify it using real fnox [Binary location and wiring]
 * [x] Run `fnox provider test` with the local plugin and release binary [Lua plugins]
 * [x] Verify mise task injection with a nonempty check and no value output
+* [x] Verify warm-cache behavior: with `FNOX_DAEMON=on`, a repeated task avoids KeePassXC prompt;
+  with it off, KeePassXC prompts again
 * [ ] Test a real application consuming a secret through mise or `fnox exec`
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
 * [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
@@ -72,20 +74,21 @@ That is the discomfort this project exists to avoid.
 
 ## Decisions
 
-| #   | Decision                                                                                                                                 | Date       | Notes                                                                                                              |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                              |
-| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                        | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                            |
-| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>` | 2026-11-19 |                                                                                                                    |
-| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                 | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                   |
-| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                              | 2026-11-19 | User choice; it is a protocol client                                                                               |
-| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                | 2026-11-19 |                                                                                                                    |
-| D7  | Automated tests first, for both Lua and Rust                                                                                             | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                            |
-| D8  | Rust for the client                                                                                                                      | 2026-11-19 | Single static binary, installable via mise                                                                         |
-| D9  | Do not re-implement the protocol; use an existing crate                                                                                  | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                     |
-| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                              | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)         |
-| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                             | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20) |
-| D12 | Find the client in order: `client_bin`, plugin-local release binary, then PATH. Build locally with mise; defer release binaries          | 2026-11-20 | Implemented and verified with fnox 1.50.0; see [Binary location and wiring](#binary-location-and-wiring)           |
+| #   | Decision                                                                                                                                 | Date       | Notes                                                                                                                        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                        |
+| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                        | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                      |
+| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>` | 2026-11-19 |                                                                                                                              |
+| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                 | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                             |
+| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                              | 2026-11-19 | User choice; it is a protocol client                                                                                         |
+| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                | 2026-11-19 |                                                                                                                              |
+| D7  | Automated tests first, for both Lua and Rust                                                                                             | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                      |
+| D8  | Rust for the client                                                                                                                      | 2026-11-19 | Single static binary, installable via mise                                                                                   |
+| D9  | Do not re-implement the protocol; use an existing crate                                                                                  | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                               |
+| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                              | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                   |
+| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                             | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)           |
+| D12 | Find the client in order: `client_bin`, plugin-local release binary, then PATH. Build locally with mise; defer release binaries          | 2026-11-20 | Implemented and verified with fnox 1.50.0; see [Binary location and wiring](#binary-location-and-wiring)                     |
+| D13 | Use mise task-scoped secrets with fnox CLI fallback and its daemon cache; direct socket optimization is not required                     | 2026-11-24 | User choice after no-prompt (`FNOX_DAEMON=on`) vs prompt (`off`) test. Keep fnox 1.50.0; don't downgrade for mise 2026.10.17 |
 
 ## Architecture (current intent)
 
@@ -606,17 +609,27 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
    fresh-association run used an absolute path under the repository's git-ignored `tmp/` directory;
    use an absolute temporary path outside the repo next time.
 
+    The direct mise daemon connection is mismatched: installed mise 2026.10.17 bundles
+    `fnox-client` 1.40.0 (wire protocol 6), while fnox 1.50.0 uses protocol 8. Protocol version is
+    part of the socket name, so these clients seek different sockets. mise 2026.11.12 bundles
+    `fnox-client` 1.50.0, matching fnox. No `[daemons]` config is needed; a socket directory
+    override alone cannot fix this protocol mismatch. Downgrading fnox to 1.40.0 would match the
+    wire version, but mise docs require fnox 1.50.0 or newer for direct daemon reads. Decision D13
+    accepts the CLI fallback: `FNOX_DAEMON=on` uses fnox's own cache and avoids repeat prompts.
+    Direct socket optimization is not required for current use.
+
 ## Next steps
 
 The original prototype steps are complete. Remaining work to use fnox for tokens:
 
 1. Test a real application consuming a secret through the mise task and/or `fnox exec`.
-2. Confirm desired no-cache behavior and decide prompt policy with **Remember** unticked; repeated
-   uncached reads may prompt repeatedly.
-3. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
-4. Link the preferred checkout/source with `fnox plugin link` or a git source in shared config.
-5. Remove token values from `mise.toml` after the real fnox flow passes.
-6. Add release tags and a published release only when release distribution is needed.
+2. Decide the environment handoff for actual use: task-scoped mise secrets or `fnox exec`.
+3. Set the desired cache TTL for the test token; initial uncached lookups still require provider
+   resolution and can prompt.
+4. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
+5. Link the preferred checkout/source with `fnox plugin link` or a git source in shared config.
+6. Remove token values from `mise.toml` after the real fnox flow passes.
+7. Add release tags and a published release only when release distribution is needed.
 
 TODO items, not yet scheduled:
 
@@ -835,6 +848,36 @@ Points to note:
 * The first direct task run appeared to wait on a process; the user ran `mise install` with the data
   directory set, then reran successfully. Root cause of the initial wait is unknown. The output
   proves task-level injection, but does not by itself prove repeated runs avoid caching/prompts.
+* The user ran the mise task twice with `FNOX_DAEMON=on`; both debug logs said
+  `fnox daemon not used (Absent); using the fnox CLI`, so neither log showed a direct mise daemon
+  hit. A later `fnox daemon status --verbose` showed the daemon running with `KPXC_TEST_PRIMARY`
+  cached.
+* Clarification from the user: KeePassXC did not prompt with `FNOX_DAEMON=on`, but did prompt with
+  it off. This strongly suggests the fnox CLI fallback used its daemon cache. Cache behavior works
+  at the observed level; mise's direct daemon fast path had not yet been checked.
+* Checked again with the daemon running and `KPXC_TEST_PRIMARY` cached. A fresh `MISE_DEBUG=1 mise
+  run test-kpxc` succeeded and did not log `asking fnox` or invoke the CLI fallback; a subsequent
+  daemon status still showed the key cached. This initially looked like a direct daemon read, but
+  later dependency inspection found a wire-version mismatch in installed mise; direct socket use
+  cannot be claimed until retested with a compatible mise.
+* Socket mismatch found: mise 2026.10.17's lockfile pins `fnox-client` 1.40.0 (wire version 6),
+  while fnox 1.50.0 uses wire version 8. The wire version is part of the socket-name hash. mise
+  2026.11.12's lockfile pins `fnox-client` 1.50.0 (wire 8). Sources:
+  [mise 2026.10.17 lockfile](https://github.com/jdx/mise/blob/v2026.10.17/Cargo.lock),
+  [mise 2026.11.12 lockfile](https://github.com/jdx/mise/blob/v2026.11.12/Cargo.lock),
+  [`fnox-client` 1.40.0](https://docs.rs/crate/fnox-client/1.40.0/source/src/lib.rs), and
+  [`fnox-client` 1.50.0](https://docs.rs/crate/fnox-client/1.50.0/source/src/lib.rs). This likely
+  explains why fnox sees its daemon while mise reports it missing. `[daemons]` in mise config is
+  for service processes, not fnox's secret daemon. Upgrade Nix-managed mise to 2026.11.12+ and
+  retest; a socket-directory override alone cannot reconcile different protocol hashes.
+* Considered downgrading fnox to match mise's embedded fnox-client 1.40.0. mise's official fnox
+  integration docs require fnox 1.50.0 or newer for direct daemon reads, so downgrade is not a
+  documented route to the direct socket. It is unnecessary for cache behavior: fnox CLI fallback
+  already uses the daemon cache and avoids repeated KeePassXC prompts.
+* Decision D13: accept mise's fnox CLI fallback for cached task secrets rather than downgrade fnox
+  or upgrade Nix-managed mise for direct socket reads. User observed no KeePassXC prompt with
+  `FNOX_DAEMON=on` and a prompt with it off. The direct socket is an optional optimization, not a
+  requirement for this project.
 * Reviewed deployment options. fnox's documented git plugin installation clones the Lua plugin;
   it has no build/install hook, so it does not build this Rust client. fnox's built-in 1Password
   provider follows the external-CLI pattern and requires `op` on PATH. Lua plugins expose HTTP and
