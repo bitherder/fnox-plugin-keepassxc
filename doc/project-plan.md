@@ -835,3 +835,14 @@ Points to note:
 * The first direct task run appeared to wait on a process; the user ran `mise install` with the data
   directory set, then reran successfully. Root cause of the initial wait is unknown. The output
   proves task-level injection, but does not by itself prove repeated runs avoid caching/prompts.
+* Reviewed deployment options. fnox's documented git plugin installation clones the Lua plugin;
+  it has no build/install hook, so it does not build this Rust client. fnox's built-in 1Password
+  provider follows the external-CLI pattern and requires `op` on PATH. Lua plugins expose HTTP and
+  process APIs, but not the local socket and NaCl crypto this KeePassXC Browser Integration client
+  needs. No deployment option selected; D12 remains unchanged.
+* Reviewed [`keepassxc-go` v1.7.0](https://github.com/MarkusFreitag/keepassxc-go/tree/v1.7.0): its
+  MIT CLI has macOS/Linux release binaries and checksums, and source includes a Windows named-pipe
+  transport. The CLI auto-associates on first use, stores its own key under the OS config
+  directory, and reports all errors with exit 1. Static source review found its protocol client
+  reads the socket once into a 4096-byte buffer and does not validate the response nonce increment.
+  No switch selected; keep the current base unless a spike or upstream fixes address these gaps.
