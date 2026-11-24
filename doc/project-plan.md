@@ -34,6 +34,9 @@ Verify live:
 
 * [x] **(you)** Run `kpxc-client associate` with KeePassXC unlocked, and approve the prompt
 * [x] **(you)** Run `kpxc-client fnox://<name>` for a test entry, then for a real token entry
+* [x] Run `fnox get KPXC_TEST_PRIMARY`; user reports it returned the test-entry value
+* [x] Repeat with absolute `XDG_DATA_HOME`; fnox ran `auth_command`, associated the test DB, and
+  retried the lookup successfully
 * [ ] **(you)** Tag each token entry in KeePassXC with a `fnox://<name>` URL [Option C]
 
 Wire up:
@@ -41,13 +44,14 @@ Wire up:
 * [x] Add a `build` mise task (`mise run build`) that builds `client/target/release/kpxc-client`
 * [x] Implement plugin-relative lookup and verify it using real fnox [Binary location and wiring]
 * [x] Run `fnox provider test` with the local plugin and release binary [Lua plugins]
-* [ ] Run `fnox get` through the provider and verify environment handoff
+* [x] Verify mise task injection with a nonempty check and no value output
+* [ ] Test a real application consuming a secret through mise or `fnox exec`
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
 * [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
 * [ ] Decide how fnox values reach the environment: `fnox exec` or a mise integration
   [Known risks, item 9]
 * [ ] Decide the per-lookup prompt policy with Remember unticked [Known risks, item 4]
-* [ ] Optional: wire `auth_command` to `kpxc-client associate` [Lua plugins]
+* [x] Wire and verify `auth_command` to `kpxc-client associate` [Lua plugins]
 
 Finish:
 
@@ -160,8 +164,10 @@ The client has `parse_reference`, the exit-code mapping (`exit_code_for` and
 `--version`, `associate`, and `fnox://<name>`, and it reads the stored association. `provider.lua`
 maps exit codes. No protocol code is written here; it comes from the library. The user reports
 running `associate` and lookups for a test entry and a real token against live KeePassXC on
-2026-11-23; exact output was not captured. `fnox provider test` with a local plugin path is also
-verified; `fnox get` and environment handoff remain untested.
+2026-11-23; exact output was not captured. `fnox provider test` with a local plugin path is
+verified. The user also reports that `fnox get KPXC_TEST_PRIMARY` returned the test-entry value
+after a fresh association through `auth_command`; environment handoff through `fnox exec` or mise
+remains untested.
 
 ### Tests that exist
 
@@ -573,10 +579,11 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
 4. **Prompting.** `get-logins` can pop a dialog in KeePassXC; a non-interactive `fnox hook-env`
    or `mise` activation must not hang. Decide on a timeout and clean failure.
    **Source-supported, not confirmed live:** with **Remember** unticked (the chosen stance), each
-   token entry should prompt on every lookup. Shell or `mise` activation that reads several tokens
-   would prompt several times. Options: accept the prompts, rely on fnox's `daemon_cache`
-   (**unverified** for this provider), or tick Remember for selected entries and accept the
-   exposure. Decide before daily use.
+   uncached token lookup should prompt. fnox can avoid repeat provider lookups with its optional
+   memory-only [daemon cache](https://fnox.jdx.dev/guide/daemon.html), but it is disabled by
+   default; the first read of each uncached value may still prompt. Cache hits are available only
+   until expiry or daemon shutdown. Any process running as the same user can request cached values.
+   Test this provider's behavior before relying on it for daily use.
 5. **Multiple databases / multiple matches.** Multiple matches map to an ambiguity error in the
    client and are covered by in-process tests. Confirm KeePassXC's "search in all databases"
    setting and the intended database behavior for daily use.
@@ -587,19 +594,27 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
 8. **Secret exposure in our own process.** The client prints the secret on stdout and fnox
    puts it in the environment. Avoid logging it; consider zeroizing buffers. Review before
    release.
-9. **fnox/mise wiring.** `fnox provider test` is verified with the local plugin and a
-   plugin-relative binary. `fnox get` and environment handoff are not yet tested. Choose between
-   `fnox exec` and mise's env integration for putting values in program environments.
+9. **fnox/mise wiring.** `fnox provider test`, test-entry `fnox get` with fresh association, and
+   task-scoped mise injection are verified using the local plugin. The mise task only asserts that
+   the variable is nonempty; use by a real application and `fnox exec` remain untested. mise's
+   experimental task-scoped `secrets.fnox` integration does not inject secrets into the shell or
+   `mise env`. It requires 2026.10.4 or newer; installed mise is 2026.10.17. fnox's direct mise
+   cache reads also require fnox 1.50.0 or newer. See the
+   [fnox mise guide](https://fnox.jdx.dev/guide/mise-integration.html) and
+   [mise fnox docs](https://mise.jdx.dev/environments/secrets/fnox.html). An earlier get used
+   relative `XDG_DATA_HOME=./data`; the client ignored it and used the default path. The successful
+   fresh-association run used an absolute path under the repository's git-ignored `tmp/` directory;
+   use an absolute temporary path outside the repo next time.
 
 ## Next steps
 
 The original prototype steps are complete. Remaining work to use fnox for tokens:
 
-1. Link the local checkout with `fnox plugin link`, add provider and token references to a
-   `fnox.toml`, then run `fnox get` against a tagged test entry.
-2. Decide how resolved values reach applications: `fnox exec` or mise env integration.
-3. Decide prompt policy with **Remember** unticked; several lookups may mean several prompts.
-4. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
+1. Test a real application consuming a secret through the mise task and/or `fnox exec`.
+2. Confirm desired no-cache behavior and decide prompt policy with **Remember** unticked; repeated
+   uncached reads may prompt repeatedly.
+3. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
+4. Link the preferred checkout/source with `fnox plugin link` or a git source in shared config.
 5. Remove token values from `mise.toml` after the real fnox flow passes.
 6. Add release tags and a published release only when release distribution is needed.
 
@@ -788,3 +803,35 @@ Points to note:
   release binary under `ctx.plugin_dir`, then PATH. Verified with fnox 1.50.0: `fnox provider test`
   loaded the repo as a local plugin and ran the release binary without a `client_bin` option or
   PATH install. Commits: `21bd9c6` (red) and `7523892` (green). `fnox get` remains untested.
+* Later, the user reported `fnox get KPXC_TEST_PRIMARY` returned the expected test-entry value.
+  The command set `XDG_DATA_HOME=./data`, which is relative; the client ignored it and used
+  `$HOME/.local/share`. No output value is recorded. Repeat with an absolute temporary data home
+  to verify fresh association setup, and separately test environment handoff.
+* Follow-up: the user reran with absolute `XDG_DATA_HOME="$PWD/data"` while using the test
+  database. fnox ran `auth_command`, association succeeded, and the retried `fnox get` returned
+  the test entry. The association file is under the git-ignored `tmp/data/` directory in this
+  checkout; inspected permissions are `0700` for the app directory and `0600` for the file. No
+  secret value is recorded. Environment handoff through `fnox exec` or mise remains untested.
+* Read the official [fnox daemon docs](https://fnox.jdx.dev/guide/daemon.html),
+  [fnox mise guide](https://fnox.jdx.dev/guide/mise-integration.html), and
+  [mise fnox docs](https://mise.jdx.dev/environments/secrets/fnox.html). Documented behavior: the
+  daemon is optional and disabled by default; its cache is memory-only. On a cache miss, mise calls
+  fnox to resolve the value, which can run this provider and prompt. On a hit, supported mise
+  versions can read from the daemon socket directly. The cache is accessible to same-user processes.
+  Local versions: fnox 1.50.0, mise 2026.5.12; mise's task-scoped fnox secrets feature requires mise
+  2026.10.4 or newer. This integration is not yet tested here.
+* The user upgraded mise to 2026.10.17, above the minimum for its experimental fnox secrets
+  integration. Next test: use a mise task scoped to `KPXC_TEST_PRIMARY`, with the fnox daemon
+  disabled and `daemon_cache = false`, against the test database.
+
+### 2026-11-24
+
+* The user reports the mise task eventually succeeded with the test database. fnox first reported
+  `DatabaseLocked`, then ran `auth_command`, associated successfully, retried, and the task's
+  `test -n "$KPXC_TEST_PRIMARY"` assertion passed. The secret value is not recorded. The task also
+  printed mise's hint that secret tasks do not receive stdin by default; this is informational for
+  this non-interactive assertion. Set `interactive = true` only for tasks that need terminal input;
+  mise then sends output directly to the terminal without redaction.
+* The first direct task run appeared to wait on a process; the user ran `mise install` with the data
+  directory set, then reran successfully. Root cause of the initial wait is unknown. The output
+  proves task-level injection, but does not by itself prove repeated runs avoid caching/prompts.

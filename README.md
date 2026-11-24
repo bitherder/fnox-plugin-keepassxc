@@ -14,9 +14,12 @@ protocol. Only entries explicitly tagged for exposure, through a
 ## Status
 
 Prototype, pre-release. Association and lookups have been run live against
-KeePassXC. The provider also passes `fnox provider test` using a local plugin
-directory and its plugin-local release binary. `fnox get` has not yet been
-tested.
+KeePassXC. The provider passes `fnox provider test` using a local plugin
+directory and its plugin-local release binary. The user also reports that
+`fnox get` retrieved the test-entry value and successfully ran `auth_command`
+to create a fresh association. A mise task also received the test value, checked
+it was nonempty, and did not print it. Use by a real application and
+`fnox exec` remain untested.
 
 Working:
 
@@ -33,8 +36,9 @@ Working:
 Not yet done:
 
 * Tagging every token entry with a `fnox://` URL.
-* Running `fnox get` through the provider and checking environment handoff.
-* Choosing the fnox plugin source and how resolved values reach the environment.
+* Testing the value with a real application and through `fnox exec`.
+* Choosing the shared fnox plugin source and how resolved values reach the
+  environment.
 * Release tags and published binaries. See [Releases](#releases).
 
 See [doc/project-plan.md](doc/project-plan.md) for the plan, decision log, and
@@ -73,12 +77,37 @@ directly.
 * The protocol is handled by `keepassxc-client`, pinned exactly. This project
   owns no protocol code.
 
+### Passing secrets to programs
+
+Run a command with fnox-resolved secrets using `fnox exec -- <command>`. mise can also grant secrets
+to individual tasks through its experimental
+[`secrets.fnox` integration](https://mise.jdx.dev/environments/secrets/fnox.html). That integration
+does not put secrets in the activated shell or `mise env`; each task must list the keys it needs.
+See fnox's [mise guide](https://fnox.jdx.dev/guide/mise-integration.html).
+
+fnox's optional [daemon](https://fnox.jdx.dev/guide/daemon.html) can cache resolved
+secrets in memory. It is disabled by default. With it enabled, first lookup still
+resolves through the provider and may prompt in KeePassXC; subsequent reads can
+use the cache until it expires or the daemon stops. The daemon does not write
+cached values to disk, but other processes running as the same user can request
+them. mise reads directly from the daemon only on a cache hit; on a miss it asks
+fnox to resolve the value.
+
+Mise does not connect stdin to a task that receives secrets by default. If the
+task needs interactive stdin, set `interactive = true`; its output then goes
+directly to the terminal and is not redacted. Avoid that setting for tasks that
+do not need terminal input.
+
 ## Security
 
 `kpxc-client associate` stores the association in
 `$XDG_DATA_HOME/fnox-plugin-keepassxc/association.json`. If `XDG_DATA_HOME` is
-unset, the path is `~/.local/share/fnox-plugin-keepassxc/association.json`. The
-app's directory is created with mode `0700`, and the file with `0600`.
+unset or relative, the path falls back to
+`~/.local/share/fnox-plugin-keepassxc/association.json`. The app's directory is
+created with mode `0700`, and the file with `0600`.
+
+`XDG_DATA_HOME` must be absolute. For isolated tests, use an absolute temporary
+directory outside the repository.
 
 The file holds the association ID and the 32-byte identification key. Treat it as
 a credential. Any process running as your user can read it and ask a running,
