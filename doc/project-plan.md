@@ -49,17 +49,20 @@ Wire up:
   with it off, KeePassXC prompts again
 * [ ] Test a real application consuming a secret through mise or `fnox exec`
 * [ ] Choose the plugin source for development (`fnox plugin link`) and, later, a git source
-* [ ] Write a `fnox.toml` example that references the plugin and the secrets [Next steps, item 7]
-* [ ] Decide how fnox values reach the environment: `fnox exec` or a mise integration
-  [Known risks, item 9]
-* [ ] Decide the per-lookup prompt policy with Remember unticked [Known risks, item 4]
+* [x] Document `fnox.toml` provider and secret-reference examples [Binary location and wiring]
+* [ ] Add a worked `mise.toml` task using `[secrets.fnox]`
+* [x] Choose task-scoped mise secrets for mise tasks; the CLI fallback uses fnox's daemon cache
+  [D13]
+* [ ] Decide whether non-mise commands also need `fnox exec` [Known risks, item 9]
+* [x] Choose security stance: keep KeePassXC **Remember** unticked; use fnox cache for warm reads
+  [Known risks, item 4]
 * [x] Wire and verify `auth_command` to `kpxc-client associate` [Lua plugins]
 
 Finish:
 
 * [ ] Remove the tokens from `mise.toml` once the checks above pass
-* [x] Record that live associate and lookup steps were completed. Exact output was not captured;
-  no secret values are logged.
+* [x] Record reported live associate, CLI lookup, `fnox get`, and mise task results without logging
+  any secret values.
 
 ## Why not the built-in fnox `keepass` provider
 
@@ -74,21 +77,21 @@ That is the discomfort this project exists to avoid.
 
 ## Decisions
 
-| #   | Decision                                                                                                                                 | Date       | Notes                                                                                                                        |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                        |
-| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                        | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                      |
-| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>` | 2026-11-19 |                                                                                                                              |
-| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                 | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                             |
-| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                              | 2026-11-19 | User choice; it is a protocol client                                                                                         |
-| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                | 2026-11-19 |                                                                                                                              |
-| D7  | Automated tests first, for both Lua and Rust                                                                                             | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                      |
-| D8  | Rust for the client                                                                                                                      | 2026-11-19 | Single static binary, installable via mise                                                                                   |
-| D9  | Do not re-implement the protocol; use an existing crate                                                                                  | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                               |
-| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                              | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                   |
-| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                             | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)           |
-| D12 | Find the client in order: `client_bin`, plugin-local release binary, then PATH. Build locally with mise; defer release binaries          | 2026-11-20 | Implemented and verified with fnox 1.50.0; see [Binary location and wiring](#binary-location-and-wiring)                     |
-| D13 | Use mise task-scoped secrets with fnox CLI fallback and its daemon cache; direct socket optimization is not required                     | 2026-11-24 | User choice after no-prompt (`FNOX_DAEMON=on`) vs prompt (`off`) test. Keep fnox 1.50.0; don't downgrade for mise 2026.10.17 |
+| #   | Decision                                                                                                                                 | Date       | Notes                                                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Integrate with KeePassXC through the **Browser Integration protocol** first; do not move to other approaches without consulting the user | 2026-11-19 | User instruction. See [options](#option-a-keepassxc-access-mechanism)                                                      |
+| D2  | Implement as an **fnox Lua plugin** plus a **Rust client binary**                                                                        | 2026-11-19 | Lua cannot do sockets or NaCl crypto, so a helper binary is unavoidable                                                    |
+| D3  | Repo at `~/Projects/fnox-plugin-keepassxc`; fnox's own term is "provider", and shareable plugins are conventionally `fnox-plugin-<name>` | 2026-11-19 |                                                                                                                            |
+| D4  | Layout: `provider.lua` and `spec/` at repo root, Rust crate in `client/`                                                                 | 2026-11-19 | `provider.lua` must be at the root for `owner/repo` git installs                                                           |
+| D5  | Name the Rust piece **`client`** (not `bridge`, `wrapper`, `core`, `agent`)                                                              | 2026-11-19 | User choice; it is a protocol client                                                                                       |
+| D6  | No `lib/` directory until Lua helpers are actually needed                                                                                | 2026-11-19 |                                                                                                                            |
+| D7  | Automated tests first, for both Lua and Rust                                                                                             | 2026-11-19 | `mise run test` runs unit, Rust, and integration suites                                                                    |
+| D8  | Rust for the client                                                                                                                      | 2026-11-19 | Single static binary, installable via mise                                                                                 |
+| D9  | Do not re-implement the protocol; use an existing crate                                                                                  | 2026-11-20 | Chose `keepassxc-client` (D10)                                                                                             |
+| D10 | Use `keepassxc-client` (KC) as the protocol base, pinned exactly (`=0.1.0`)                                                              | 2026-11-20 | User decision. Supersedes the "behind a trait of our own" plan. See [Option B](#option-b-protocol-library)                 |
+| D11 | Keep a Rust binary, but make it a thin CLI over KC; it owns no protocol code                                                             | 2026-11-20 | Lua has no sockets or NaCl crypto, and fnox can only run processes. See [Re-evaluation](#re-evaluation-2026-11-20)         |
+| D12 | Find the client in order: `client_bin`, plugin-local release binary, then PATH. Build locally with mise; defer release binaries          | 2026-11-20 | Implemented and verified with fnox 1.50.0; see [Binary location and wiring](#binary-location-and-wiring)                   |
+| D13 | Use task-scoped mise secrets with fnox CLI fallback and fnox daemon cache; direct socket optimization is not required                    | 2026-11-24 | User choice after on/off prompt test. Keep fnox 1.50.0; do not downgrade for mise 2026.10.17. Actual app use remains open. |
 
 ## Architecture (current intent)
 
@@ -169,8 +172,9 @@ maps exit codes. No protocol code is written here; it comes from the library. Th
 running `associate` and lookups for a test entry and a real token against live KeePassXC on
 2026-11-23; exact output was not captured. `fnox provider test` with a local plugin path is
 verified. The user also reports that `fnox get KPXC_TEST_PRIMARY` returned the test-entry value
-after a fresh association through `auth_command`; environment handoff through `fnox exec` or mise
-remains untested.
+after a fresh association through `auth_command`. A task-scoped mise secret test verified that the
+value reaches a process using only a nonempty assertion. A real application consumer and
+`fnox exec` remain untested.
 
 ### Tests that exist
 
@@ -193,8 +197,11 @@ See [Re-evaluation](#re-evaluation-2026-11-20) for the proposed target structure
   (a natural home for `kpxc-client associate`).
 * Plugin state does not persist between lookups (fnox may reload the plugin), so any caching
   must live in the client or fnox, not in Lua module variables.
-* Every provider also accepts `daemon_cache`. **Unverified:** what it does and whether it
-  helps here. Read the fnox docs before designing any caching.
+* Providers and secrets accept `daemon_cache`; it defaults to true and can opt a value out of the
+  fnox daemon's memory cache. The daemon itself is optional and disabled by default. With it
+  enabled, warm cache reads can avoid calling `provider.get`; cache misses resolve through the
+  provider. Verified behavior for this plugin is in
+  [Known risks and open questions](#known-risks-and-open-questions).
 
 ## Options
 
@@ -222,25 +229,26 @@ and the [browser extension](https://github.com/keepassxreboot/keepassxc-browser)
 
 ### Option B: protocol library
 
-Both crates were downloaded and read in full on 2026-11-20. Neither has been run against
-KeePassXC.
+Both crates were downloaded and read in full on 2026-11-20. At comparison time neither had been
+run against KeePassXC. Later live tests validated `keepassxc-client`; `keepassxc-proxy-lib` was not
+used.
 
-|                                        | `keepassxc-proxy-lib` 0.2.0                                                                              | `keepassxc-client` 0.1.0                                     |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Repo                                   | git.dog/xx/keepassxc-proxy-lib                                                                           | gitlab.com/GaffaFix/keepassxc-client                         |
-| Licence                                | MIT                                                                                                      | MIT OR Apache-2.0                                            |
-| Model                                  | Blocking, std only (about 900 lines)                                                                     | Async on tokio (about 950 lines)                             |
-| Socket read                            | Reads until a short read (<4096 bytes); can truncate a split reply or block on an exact multiple of 4096 | Incremental JSON stream parsing                              |
-| Signals (`database-locked`/`unlocked`) | Not handled; surfaces as "No nonce in response"                                                          | Skipped and queued                                           |
-| Reply nonce (+1) check                 | None                                                                                                     | Yes, with a tamper test                                      |
-| "No logins found" (code 15)            | Error (`KeePassXCErrorCode`), mappable by us                                                             | Normalized to an empty vec                                   |
-| Custom `KPH:` fields                   | `string_fields`                                                                                          | `string_fields`                                              |
-| `triggerUnlock`                        | Yes (`test_associate(true)`)                                                                             | Not exposed                                                  |
-| Association                            | `{name, public_key}` (serde)                                                                             | `{id, idKey}` and `IdKeyPair`                                |
-| Own tests                              | Three trivial tests                                                                                      | Fake-KeePassXC round trips (private to the crate)            |
-| macOS                                  | "untested"                                                                                               | Socket candidates include `$TMPDIR`; validated on Linux only |
-| Maturity                               | 3 releases, about 360 downloads, one maintainer                                                          | 1 release, about 18 downloads, one maintainer                |
-| Windows                                | Named pipe                                                                                               | Stub (irrelevant here)                                       |
+|                                        | `keepassxc-proxy-lib` 0.2.0                                                                              | `keepassxc-client` 0.1.0                                                                                                             |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Repo                                   | git.dog/xx/keepassxc-proxy-lib                                                                           | gitlab.com/GaffaFix/keepassxc-client                                                                                                 |
+| Licence                                | MIT                                                                                                      | MIT OR Apache-2.0                                                                                                                    |
+| Model                                  | Blocking, std only (about 900 lines)                                                                     | Async on tokio (about 950 lines)                                                                                                     |
+| Socket read                            | Reads until a short read (<4096 bytes); can truncate a split reply or block on an exact multiple of 4096 | Incremental JSON stream parsing                                                                                                      |
+| Signals (`database-locked`/`unlocked`) | Not handled; surfaces as "No nonce in response"                                                          | Skipped and queued                                                                                                                   |
+| Reply nonce (+1) check                 | None                                                                                                     | Yes, with a tamper test                                                                                                              |
+| "No logins found" (code 15)            | Error (`KeePassXCErrorCode`), mappable by us                                                             | Normalized to an empty vec                                                                                                           |
+| Custom `KPH:` fields                   | `string_fields`                                                                                          | `string_fields`                                                                                                                      |
+| `triggerUnlock`                        | Yes (`test_associate(true)`)                                                                             | Not exposed                                                                                                                          |
+| Association                            | `{name, public_key}` (serde)                                                                             | `{id, idKey}` and `IdKeyPair`                                                                                                        |
+| Own tests                              | Three trivial tests                                                                                      | Fake-KeePassXC round trips (private to the crate)                                                                                    |
+| macOS                                  | "untested"                                                                                               | Socket candidates include `$TMPDIR`; upstream validation was Linux-only. This project later live-tested `keepassxc-client` on macOS. |
+| Maturity                               | 3 releases, about 360 downloads, one maintainer                                                          | 1 release, about 18 downloads, one maintainer                                                                                        |
+| Windows                                | Named pipe                                                                                               | Stub (irrelevant here)                                                                                                               |
 
 Trade-off summary:
 
@@ -270,12 +278,12 @@ Verified on this machine on 2026-11-20 with a throwaway crate outside the repo:
 
 `get-logins` matches on the entry's **URL field**, not on its title or group path.
 
-| Option                                                                                                    | Example                                                | Notes                                                                                                                                     |
-| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `fnox://<name>` in the entry's URL field, or in a Browser Integration additional URL (current assumption) | `value = "fnox://github-token"`                        | Explicit and visible in KeePassXC. **Source-supported, not live-verified** (see below)                                                    |
-| `keepassxc://by-path/<group>/<title>` (new, found in source)                                              | `value = "keepassxc://by-path/fnox-test/github-token"` | No URL tagging needed. Uses KeePassXC's own hierarchy. Relies on a special case that the code comments describe as "the schema keepassxc" |
-| A syntactically normal URL                                                                                | `https://fnox.invalid/github-token`                    | Likely matches reliably but is uglier                                                                                                     |
-| Title or group path (as fnox's `keepass` provider does)                                                   | `work/github`                                          | Not available through `get-logins`; would need a workaround                                                                               |
+| Option                                                                               | Example                                                | Notes                                                                                                                      |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `fnox://<name>` in the entry's URL field, or in a Browser Integration additional URL | `value = "fnox://github-token"`                        | **Live-verified** on KeePassXC 2.8.0 for primary and additional URLs (see results below). Use lowercase, hyphenated names. |
+| `keepassxc://by-path/<group>/<title>` (native selector found in source)              | `value = "keepassxc://by-path/fnox-test/github-token"` | Live-verified for entries that have a URL. A matched URL-less entry crashed KeePassXC during one test. See live results.   |
+| A syntactically normal URL                                                           | `https://fnox.invalid/github-token`                    | Likely matches reliably but is uglier                                                                                      |
+| Title or group path (as fnox's `keepass` provider does)                              | `work/github`                                          | Not available through `get-logins`; would need a workaround                                                                |
 
 Also consider returning a non-password field (`login`, or a `KPH:` custom field) by
 adding a field selector to the reference, for example `fnox://name#login`.
@@ -577,16 +585,18 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
    for entries with a URL. Keep lowercase, hyphenated names; dots can widen host matching.
 2. **macOS transport** is verified live with `keepassxc-client` on this machine: socket discovery,
    association, and lookups worked. `keepassxc-proxy-lib` was not used and is no longer a candidate.
-3. **Confirmation-dialog behaviour** for already-associated clients (Option D), especially the
-   effect of **Remember**, is not confirmed live.
-4. **Prompting.** `get-logins` can pop a dialog in KeePassXC; a non-interactive `fnox hook-env`
-   or `mise` activation must not hang. Decide on a timeout and clean failure.
-   **Source-supported, not confirmed live:** with **Remember** unticked (the chosen stance), each
-   uncached token lookup should prompt. fnox can avoid repeat provider lookups with its optional
-   memory-only [daemon cache](https://fnox.jdx.dev/guide/daemon.html), but it is disabled by
-   default; the first read of each uncached value may still prompt. Cache hits are available only
-   until expiry or daemon shutdown. Any process running as the same user can request cached values.
-   Test this provider's behavior before relying on it for daily use.
+3. **Confirmation dialog** for an already-associated client is live-verified on the test entry:
+   uncached lookup with `FNOX_DAEMON=off` prompted. Whether **Remember** preserves approval across
+   later requests has not been isolated in a test.
+4. **Prompting.** `get-logins` can pop a dialog in KeePassXC; a non-interactive `fnox hook-env` or
+   `mise` activation must not hang. Decide on a timeout and clean failure.
+   **Live result, test entry only:** with `FNOX_DAEMON=off`, an uncached lookup prompted in
+   KeePassXC; with a warm daemon cache, lookup returned without a prompt. fnox can avoid repeat
+   provider lookups with its optional memory-only
+   [daemon cache](https://fnox.jdx.dev/guide/daemon.html), but it is disabled by default; the first
+   read of each uncached value may still prompt. Cache hits last until expiry or daemon shutdown.
+   Any process running as the same user can request cached values. The independent persistence
+   effect of KeePassXC's **Remember** checkbox remains unverified.
 5. **Multiple databases / multiple matches.** Multiple matches map to an ambiguity error in the
    client and are covered by in-process tests. Confirm KeePassXC's "search in all databases"
    setting and the intended database behavior for daily use.
@@ -622,10 +632,10 @@ created. Not needed for the test plan, but worth reporting upstream if the behav
 
 The original prototype steps are complete. Remaining work to use fnox for tokens:
 
-1. Test a real application consuming a secret through the mise task and/or `fnox exec`.
-2. Decide the environment handoff for actual use: task-scoped mise secrets or `fnox exec`.
-3. Set the desired cache TTL for the test token; initial uncached lookups still require provider
-   resolution and can prompt.
+1. Test a real application consuming a secret through a mise task.
+2. Decide whether standalone commands also need `fnox exec`.
+3. Choose production cache TTL; test config's `10m`/`30m` limits are temporary. Initial uncached
+   lookups still resolve through the provider and may prompt.
 4. Tag each desired KeePassXC token entry with its `fnox://<name>` URL.
 5. Link the preferred checkout/source with `fnox plugin link` or a git source in shared config.
 6. Remove token values from `mise.toml` after the real fnox flow passes.
@@ -878,6 +888,10 @@ Points to note:
   or upgrade Nix-managed mise for direct socket reads. User observed no KeePassXC prompt with
   `FNOX_DAEMON=on` and a prompt with it off. The direct socket is an optional optimization, not a
   requirement for this project.
+* Plan audit updated completed statuses: `fnox get`, fresh association via `auth_command`, and
+  mise task-level injection are recorded as verified. The test confirms a value reaches the task,
+  not a real consuming application. Added `fnox.toml` examples; a worked `mise.toml` task example,
+  plugin-source choice, actual app use, token migration, and release remain open.
 * Reviewed deployment options. fnox's documented git plugin installation clones the Lua plugin;
   it has no build/install hook, so it does not build this Rust client. fnox's built-in 1Password
   provider follows the external-CLI pattern and requires `op` on PATH. Lua plugins expose HTTP and
@@ -889,3 +903,7 @@ Points to note:
   directory, and reports all errors with exit 1. Static source review found its protocol client
   reads the socket once into a 4096-byte buffer and does not validate the response nonce increment.
   No switch selected; keep the current base unless a spike or upstream fixes address these gaps.
+* Follow-up status review corrected the comparison and reference-scheme sections to reflect the
+  live macOS KeePassXC tests. Updated fnox's daemon-cache description from official docs and
+  recorded that the Remember checkbox's persistence effect remains unverified. D13 selects the
+  working CLI fallback; direct socket access is an optional optimization.

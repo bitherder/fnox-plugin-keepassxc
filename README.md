@@ -40,8 +40,7 @@ Not yet done:
 
 * Tagging every token entry with a `fnox://` URL.
 * Testing the value with a real application and through `fnox exec`.
-* Choosing the shared fnox plugin source and how resolved values reach the
-  environment.
+* Choosing the shared fnox plugin source.
 * Release tags and published binaries. See [Releases](#releases).
 
 See [doc/project-plan.md](doc/project-plan.md) for the plan, decision log, and
@@ -127,10 +126,10 @@ permissions and on KeePassXC's per-entry approval.
 Precautions:
 
 * Keep KeePassXC locked when you are not using it. Lookups need it unlocked.
-* Leave the **Remember** checkbox in KeePassXC's access dialog unticked, so each
-  lookup asks for approval. Ticking it appears to save the approval, so later
-  lookups for that entry would not prompt. The source reading suggests this, but
-  it has not been checked live yet.
+* Leave the **Remember** checkbox in KeePassXC's access dialog unticked to retain
+  per-entry approval. Uncached lookups prompt; warm fnox daemon cache hits bypass
+  the provider and prompt. The user observed both. Remember's persistence behavior
+  itself has not been independently tested.
 * Tag only the entries you need, and prefer dedicated entries for fnox.
 * Do not put the file under version control, in a sync folder, or in a backup you
   share. Your dotfiles repository must not track it.
